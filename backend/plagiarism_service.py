@@ -169,15 +169,19 @@ def parse_and_cluster(contest_slug, threshold=50.0):
     print(f"[*] Parsing results with threshold {threshold}%...")
     _, _, _, jplag_results_dir = get_paths(contest_slug)
     
-    uf = UnionFind()
-    user_questions = defaultdict(set)
+    # Dictionary to hold UF for each question: { "Q1": UnionFind(), "Q2": UnionFind()... }
+    question_ufs = defaultdict(UnionFind)
     
     if not os.path.exists(jplag_results_dir):
-        return uf, user_questions
+        return question_ufs
         
     for q_id in os.listdir(jplag_results_dir):
         q_path = os.path.join(jplag_results_dir, q_id)
         if not os.path.isdir(q_path): continue
+        
+        # Ensure we have a UF for this question even if no matches found yet
+        if q_id not in question_ufs:
+            question_ufs[q_id] = UnionFind()
         
         for lang in os.listdir(q_path):
             lang_path = os.path.join(q_path, lang)
@@ -209,9 +213,8 @@ def parse_and_cluster(contest_slug, threshold=50.0):
                                     u2 = user2_file.rsplit('.', 1)[0]
                                     
                                     if score >= threshold:
-                                        uf.union(u1, u2)
-                                        user_questions[u1].add(q_id)
-                                        user_questions[u2].add(q_id)
+                                        # Union in the specific question's UF
+                                        question_ufs[q_id].union(u1, u2)
                                 except ValueError:
                                     pass
                                     
@@ -219,30 +222,27 @@ def parse_and_cluster(contest_slug, threshold=50.0):
                         except Exception:
                             continue
 
-    return uf, user_questions
+    return question_ufs
 
-def generate_plagiarism_report(contest_slug, uf, user_questions):
+def generate_plagiarism_report(contest_slug, question_ufs):
     print("[*] Generating Plagiarism Report...")
     output_dir, _, _, _ = get_paths(contest_slug)
-    
-    clusters = uf.get_clusters()
     
     report_path = os.path.join(output_dir, "plagiarism_report.csv")
     with open(report_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["cluster_id", "users_count", "questions", "users"])
+        writer.writerow(["question", "cluster_id", "users_count", "users"])
         
-        for i, (root, members) in enumerate(clusters.items()):
-            if len(members) > 1:
-                involved_qs = set()
-                for member in members:
-                    involved_qs.update(user_questions[member])
-                
-                questions_str = ", ".join(sorted(involved_qs))
-                writer.writerow([i+1, len(members), questions_str, ", ".join(members)])
+        total_clusters = 0
+        for q_id, uf in question_ufs.items():
+            clusters = uf.get_clusters()
+            for i, (root, members) in enumerate(clusters.items()):
+                if len(members) > 1:
+                    writer.writerow([q_id, i+1, len(members), ", ".join(members)])
+                    total_clusters += 1
                 
     print(f"[✓] Report saved to: {report_path}")
-    print(f"    Found {len([c for c in clusters.values() if len(c)>1])} clusters of potential plagiarism.")
+    print(f"    Found {total_clusters} clusters of potential plagiarism across all questions.")
 
 def run_pipeline(contest_slug):
     if not setup_jplag():
@@ -252,8 +252,8 @@ def run_pipeline(contest_slug):
     if questions_languages:
         run_jplag(contest_slug, questions_languages)
         
-    uf, user_questions = parse_and_cluster(contest_slug, 50.0)
-    generate_plagiarism_report(contest_slug, uf, user_questions)
+    question_ufs = parse_and_cluster(contest_slug, 50.0)
+    generate_plagiarism_report(contest_slug, question_ufs)
     return True
 
 if __name__ == "__main__":

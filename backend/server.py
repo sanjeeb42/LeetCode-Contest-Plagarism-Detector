@@ -133,34 +133,45 @@ def get_results():
 
     try:
         threshold = float(request.args.get('threshold', 50.0))
-        uf, user_questions = plagiarism_detector.parse_and_cluster(slug, threshold)
-        clusters = uf.get_clusters()
+        # Now returns a dict: { "Q1": UnionFind, "Q2": UnionFind... }
+        question_ufs = plagiarism_detector.parse_and_cluster(slug, threshold)
         user_ranks = plagiarism_detector.load_user_ranks(slug)
         
-        result = []
-        sorted_clusters = sorted(clusters.items(), key=lambda x: len(x[1]), reverse=True)
+        # Structure: { "Q1": [ {size, members: []} ], "Q2": ... }
+        results_by_question = {}
         
-        for _, members in sorted_clusters:
-            if len(members) > 1:
-                involved_qs = set()
-                member_details = []
-                for member in members:
-                    involved_qs.update(user_questions[member])
-                    rank = user_ranks.get(member, "N/A")
-                    member_details.append({"username": member, "rank": rank})
-                
-                # Sort members by rank
-                def rank_key(m):
-                    try: return int(m["rank"])
-                    except: return 999999
-                member_details.sort(key=rank_key)
+        # Sort questions (Q1, Q2, Q3, Q4...)
+        sorted_qs = sorted(question_ufs.keys())
+        
+        for q_id in sorted_qs:
+            uf = question_ufs[q_id]
+            clusters = uf.get_clusters()
+            
+            q_results = []
+            sorted_clusters = sorted(clusters.items(), key=lambda x: len(x[1]), reverse=True)
+            
+            for _, members in sorted_clusters:
+                if len(members) > 1:
+                    member_details = []
+                    for member in members:
+                        rank = user_ranks.get(member, "N/A")
+                        member_details.append({"username": member, "rank": rank})
+                    
+                    # Sort members by rank
+                    def rank_key(m):
+                        try: return int(m["rank"])
+                        except: return 999999
+                    member_details.sort(key=rank_key)
 
-                result.append({
-                    "size": len(members),
-                    "questions": sorted(list(involved_qs)),
-                    "members": member_details
-                })
-        return jsonify(result)
+                    q_results.append({
+                        "size": len(members),
+                        "members": member_details
+                    })
+            
+            if q_results:
+                results_by_question[q_id] = q_results
+                
+        return jsonify(results_by_question)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -172,8 +183,7 @@ def export_results():
 
     try:
         threshold = float(request.args.get('threshold', 50.0))
-        uf, user_questions = plagiarism_detector.parse_and_cluster(slug, threshold)
-        clusters = uf.get_clusters()
+        question_ufs = plagiarism_detector.parse_and_cluster(slug, threshold)
         user_ranks = plagiarism_detector.load_user_ranks(slug)
         
         # Prepare CSV data
@@ -183,25 +193,25 @@ def export_results():
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Cluster ID", "Size", "Questions", "Members (User [Rank])"])
+        writer.writerow(["Question", "Cluster ID", "Size", "Members (User [Rank])"])
 
-        sorted_clusters = sorted(clusters.items(), key=lambda x: len(x[1]), reverse=True)
-        
-        cluster_id = 1
-        for _, members in sorted_clusters:
-            if len(members) > 1:
-                involved_qs = set()
-                member_details = []
-                for member in members:
-                    involved_qs.update(user_questions[member])
-                    rank = user_ranks.get(member, "N/A")
-                    member_details.append(f"{member} [{rank}]")
-                
-                questions_str = ", ".join(sorted(list(involved_qs)))
-                members_str = ", ".join(member_details)
-                
-                writer.writerow([cluster_id, len(members), questions_str, members_str])
-                cluster_id += 1
+        sorted_qs = sorted(question_ufs.keys())
+
+        for q_id in sorted_qs:
+            uf = question_ufs[q_id]
+            clusters = uf.get_clusters()
+            sorted_clusters = sorted(clusters.items(), key=lambda x: len(x[1]), reverse=True)
+            
+            local_cluster_id = 1
+            for _, members in sorted_clusters:
+                if len(members) > 1:
+                    member_details = []
+                    for member in members:
+                        rank = user_ranks.get(member, "N/A")
+                        member_details.append(f"{member} [{rank}]")
+                    
+                    writer.writerow([q_id, local_cluster_id, len(members), ", ".join(member_details)])
+                    local_cluster_id += 1
         
         return Response(output.getvalue(), mimetype="text/csv", headers={"Content-disposition": f"attachment; filename=plagiarism_report_{slug}_{threshold}.csv"})
 
