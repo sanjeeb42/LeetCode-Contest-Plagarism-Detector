@@ -38,6 +38,7 @@ contest_report_*/
 submissions/
 raw_data.json
 *.csv
+*.jar
 
 # JPlag Results
 jplag_results/
