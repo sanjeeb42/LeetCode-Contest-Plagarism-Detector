@@ -1,0 +1,43 @@
+# Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+frontend/dist/
+frontend/.swc/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+
+# Data & Reports
+backend/resources/
+contest_report_*/
+submissions/
+raw_data.json
+*.csv
+
+# JPlag Results
+jplag_results/
