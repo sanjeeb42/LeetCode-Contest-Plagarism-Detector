@@ -164,5 +164,49 @@ def get_results():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/export', methods=['GET'])
+def export_results():
+    slug = request.args.get('contest_slug')
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+
+    try:
+        threshold = float(request.args.get('threshold', 50.0))
+        uf, user_questions = plagiarism_detector.parse_and_cluster(slug, threshold)
+        clusters = uf.get_clusters()
+        user_ranks = plagiarism_detector.load_user_ranks(slug)
+        
+        # Prepare CSV data
+        import io
+        import csv
+        from flask import Response
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Cluster ID", "Size", "Questions", "Members (User [Rank])"])
+
+        sorted_clusters = sorted(clusters.items(), key=lambda x: len(x[1]), reverse=True)
+        
+        cluster_id = 1
+        for _, members in sorted_clusters:
+            if len(members) > 1:
+                involved_qs = set()
+                member_details = []
+                for member in members:
+                    involved_qs.update(user_questions[member])
+                    rank = user_ranks.get(member, "N/A")
+                    member_details.append(f"{member} [{rank}]")
+                
+                questions_str = ", ".join(sorted(list(involved_qs)))
+                members_str = ", ".join(member_details)
+                
+                writer.writerow([cluster_id, len(members), questions_str, members_str])
+                cluster_id += 1
+        
+        return Response(output.getvalue(), mimetype="text/csv", headers={"Content-disposition": f"attachment; filename=plagiarism_report_{slug}_{threshold}.csv"})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, port=5050)
