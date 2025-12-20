@@ -37,6 +37,27 @@ def fetch_contest_data():
         print(f"!! Network Error: {e}")
     return None
 
+def fetch_submission_code(submission_id):
+    """Fetches submission code for a given submission ID."""
+    url = f"https://leetcode.com/api/submissions/{submission_id}/"
+    headers = {
+         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+    
+    try:
+        # Respect rate limits
+        time.sleep(1.5) 
+        
+        resp = requests.get(url, headers=headers, impersonate="chrome", timeout=30)
+        if resp.status_code == 200:
+            return resp.json().get("code", "")
+        else:
+            print(f"!! Failed to fetch code for {submission_id}: Status {resp.status_code}")
+    except Exception as e:
+        print(f"!! Error fetching code for {submission_id}: {e}")
+        
+    return ""
+
 def generate_report(data):
     """Maps parallel 'total_rank' and 'submissions' arrays to a CSV."""
     print("[*] Generating CSV Report...")
@@ -54,23 +75,36 @@ def generate_report(data):
         writer = csv.writer(f)
 
         # Build Header
-        header = ["user", "rank", "question1_id", "question2_id", "question3_id", "question4_id"]
+        header = ["user", "rank", "question1_id", "question2_id", "question3_id", "question4_id", 
+                  "codeq1", "codeq2", "codeq3", "codeq4"]
         writer.writerow(header)
 
         # ZIP the parallel lists: index i in rank matches index i in submissions
-        for rank_entry, sub_entry in zip(total_rank, submissions_list):
+        for i, (rank_entry, sub_entry) in enumerate(zip(total_rank, submissions_list)):
             username = rank_entry.get("username")
             rank = rank_entry.get("rank")
+            
+            print(f"Processing {i+1}/{len(total_rank)}: {username}")
 
             row = [username, rank]
+            code_entries = []
 
             # Map Submission IDs to the correct columns
             for q_id in q_ids:
                 q_data = sub_entry.get(q_id, {})
                 sub_id = q_data.get("submission_id", "")
                 row.append(sub_id)
-
+                
+                # Fetch Code if submission exists
+                if sub_id:
+                    code = fetch_submission_code(sub_id)
+                    code_entries.append(code)
+                else:
+                    code_entries.append("")
+            
+            row.extend(code_entries)
             writer.writerow(row)
+            f.flush() # Ensure data is written incrementally
 
     print(f"[✓] Success! Report saved to: {REPORT_FILE}")
 
