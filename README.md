@@ -1,7 +1,10 @@
 # LeetCode Detective 🕵️‍♂️
-> *Identify plagiarism clusters in LeetCode contests using JPlag and graph clustering.*
+> *Identify plagiarism clusters in LeetCode contests using graph clustering.*
 
 **Project developed in personal capacity.**
+
+> [!CAUTION]
+> **Educational Purpose Only**: This tool is designed strictly for educational purposes to demonstrate algorithms for similarity detection. It is **not** intended to target, harm, or disrupt LeetCode's platform or services. Please use responsibly and respect LeetCode's Terms of Service.
 
 ## Overview
 This tool automates the process of fetching submission code from LeetCode contests, running the JPlag plagiarism detection engine, and visualizing the results. It groups users into "Threat Clusters" based on code similarity, allowing for granular inspection of copying rings on a per-question basis.
