@@ -185,6 +185,7 @@ def export_results():
         threshold = float(request.args.get('threshold', 50.0))
         question_ufs = plagiarism_detector.parse_and_cluster(slug, threshold)
         user_ranks = plagiarism_detector.load_user_ranks(slug)
+        user_subs = plagiarism_detector.load_user_submission_ids(slug)
         
         # Prepare CSV data
         import io
@@ -193,7 +194,7 @@ def export_results():
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Question", "Cluster ID", "Size", "Members (User [Rank])"])
+        writer.writerow(["Question", "Cluster ID", "Size", "Members (User [Rank])", "Members (User [Submission ID])"])
 
         sorted_qs = sorted(question_ufs.keys())
 
@@ -205,12 +206,17 @@ def export_results():
             local_cluster_id = 1
             for _, members in sorted_clusters:
                 if len(members) > 1:
-                    member_details = []
+                    member_details_rank = []
+                    member_details_sub = []
+                    
                     for member in members:
                         rank = user_ranks.get(member, "N/A")
-                        member_details.append(f"{member} [{rank}]")
+                        member_details_rank.append(f"{member} [{rank}]")
+                        
+                        sub_id = user_subs.get(member, {}).get(q_id, "N/A")
+                        member_details_sub.append(f"{member} [{sub_id}]")
                     
-                    writer.writerow([q_id, local_cluster_id, len(members), ", ".join(member_details)])
+                    writer.writerow([q_id, local_cluster_id, len(members), ", ".join(member_details_rank), ", ".join(member_details_sub)])
                     local_cluster_id += 1
         
         return Response(output.getvalue(), mimetype="text/csv", headers={"Content-disposition": f"attachment; filename=plagiarism_report_{slug}_{threshold}.csv"})

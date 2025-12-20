@@ -79,6 +79,32 @@ def load_user_ranks(contest_slug):
                 ranks[row["user"]] = row["rank"]
     return ranks
 
+def load_user_submission_ids(contest_slug):
+    _, csv_file, _, _ = get_paths(contest_slug)
+    # Returns { user: { "Q1": sub_id, "Q2": sub_id... } }
+    submissions = defaultdict(dict)
+    if os.path.exists(csv_file):
+        with open(csv_file, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            
+            # Identify question ID columns (question1_id, question2_id...)
+            q_cols = {} # { "question1_id": "Q1", ... }
+            for fn in fieldnames:
+                if fn.startswith("question") and fn.endswith("_id"):
+                    try:
+                        num = fn.replace("question", "").replace("_id", "")
+                        q_cols[fn] = f"Q{num}"
+                    except: pass
+            
+            for row in reader:
+                user = row["user"]
+                for col, q_label in q_cols.items():
+                    sub_id = row.get(col)
+                    if sub_id:
+                        submissions[user][q_label] = sub_id
+    return submissions
+
 def export_submissions(contest_slug):
     print("[*] Exporting submissions from CSV...")
     _, csv_file, submissions_dir, _ = get_paths(contest_slug)
