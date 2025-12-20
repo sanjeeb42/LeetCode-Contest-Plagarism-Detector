@@ -1,0 +1,47 @@
+[
+    {
+        "color": "sky",
+        "name": "Biweekly Contest 172",
+        "slug": "biweekly-contest-172"
+    },
+    {
+        "color": "violet",
+        "name": "Weekly Contest 480",
+        "slug": "weekly-contest-480"
+    },
+    {
+        "color": "emerald",
+        "name": "Weekly Contest 481",
+        "slug": "weekly-contest-481"
+    },
+    {
+        "color": "rose",
+        "name": "Biweekly Contest 173",
+        "slug": "biweekly-contest-173"
+    },
+    {
+        "color": "emerald",
+        "name": "Weekly Contest 479",
+        "slug": "weekly-contest-479"
+    },
+    {
+        "color": "violet",
+        "name": "Weekly Contest 478",
+        "slug": "weekly-contest-478"
+    },
+    {
+        "color": "cyan",
+        "name": "Biweekly Contest 171",
+        "slug": "biweekly-contest-171"
+    },
+    {
+        "color": "amber",
+        "name": "Weekly Contest 477",
+        "slug": "weekly-contest-477"
+    },
+    {
+        "name": "Biweekly Contest 170",
+        "slug": "biweekly-contest-170",
+        "color": "amber"
+    }
+]

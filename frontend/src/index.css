@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  color-scheme: dark;
+}
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  /* Deep Space Background */
+  background: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 100%);
+  color: #f8fafc;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Subtle Grid Pattern */
+.bg-grid {
+  background-size: 50px 50px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  mask-image: linear-gradient(to bottom, black 40%, transparent 90%);
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  @apply bg-slate-900/40 backdrop-blur-xl border border-white/10 shadow-2xl;
+}
+
+.glass-card {
+  @apply bg-slate-800/30 backdrop-blur-md border border-white/5 hover:border-white/10 transition-all duration-300;
+}
+
+.text-glow {
+  text-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+}

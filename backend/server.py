@@ -1,0 +1,168 @@
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+import threading
+import json
+import os
+import contest_fetcher as data_collector
+import plagiarism_service as plagiarism_detector
+
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+# Global state for task tracking
+# task_status = { "contest_slug": { "fetch": {...}, "analyze": {...} } }
+task_status = {}
+
+CONTESTS_FILE = "contests.json"
+
+def load_contests():
+    if not os.path.exists(CONTESTS_FILE):
+        return [
+           { "name": "Biweekly Contest 172", "slug": "biweekly-contest-172", "color": "sky" },
+           { "name": "Weekly Contest 480", "slug": "weekly-contest-480", "color": "violet" },
+           { "name": "Weekly Contest 481", "slug": "weekly-contest-481", "color": "emerald" },
+           { "name": "Biweekly Contest 173", "slug": "biweekly-contest-173", "color": "rose" },
+        ]
+    try:
+        with open(CONTESTS_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_contests(contests):
+    with open(CONTESTS_FILE, "w") as f:
+        json.dump(contests, f, indent=4)
+
+def init_task_status(slug):
+    if slug not in task_status:
+        task_status[slug] = {
+            "fetch": {"status": "idle", "message": "", "progress": 0},
+            "analyze": {"status": "idle", "message": "", "progress": 0}
+        }
+
+def run_fetch_task(slug):
+    global task_status
+    # Status is already set to running by the triggering endpoint
+    try:
+        def update_progress(p):
+            task_status[slug]["fetch"]["progress"] = p
+            
+        success = data_collector.run_data_collection(slug, progress_callback=update_progress)
+        if success:
+            task_status[slug]["fetch"] = {"status": "success", "message": "Data collection complete.", "progress": 100}
+        else:
+            task_status[slug]["fetch"] = {"status": "error", "message": "Data collection failed."}
+    except Exception as e:
+        task_status[slug]["fetch"] = {"status": "error", "message": str(e)}
+
+def run_analyze_task(slug):
+    global task_status
+    try:
+        success = plagiarism_detector.run_pipeline(slug)
+        if success:
+            task_status[slug]["analyze"] = {"status": "success", "message": "Analysis complete."}
+        else:
+            task_status[slug]["analyze"] = {"status": "error", "message": "Analysis failed."}
+    except Exception as e:
+        task_status[slug]["analyze"] = {"status": "error", "message": str(e)}
+
+@app.route('/api/contests', methods=['GET'])
+def get_contests_route():
+    return jsonify(load_contests())
+
+@app.route('/api/contests', methods=['POST'])
+def save_contests_route():
+    contests = request.json
+    save_contests(contests)
+    return jsonify({"message": "Saved"})
+
+@app.route('/api/fetch', methods=['POST'])
+def trigger_fetch():
+    data = request.json
+    slug = data.get("contest_slug")
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+
+    init_task_status(slug)
+        
+    if task_status[slug]["fetch"]["status"] == "running":
+        return jsonify({"error": "Fetch already in progress"}), 409
+    
+    # Synchronous update to avoid race condition
+    task_status[slug]["fetch"] = {"status": "running", "message": "Starting fetch...", "progress": 0}
+
+    thread = threading.Thread(target=run_fetch_task, args=(slug,))
+    thread.start()
+    return jsonify({"message": f"Fetch started for {slug}"}), 202
+
+@app.route('/api/analyze', methods=['POST'])
+def trigger_analyze():
+    data = request.json
+    slug = data.get("contest_slug")
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+
+    init_task_status(slug)
+
+    if task_status[slug]["analyze"]["status"] == "running":
+        return jsonify({"error": "Analysis already in progress"}), 409
+
+    # Synchronous update
+    task_status[slug]["analyze"] = {"status": "running", "message": "Starting analysis..."}
+        
+    thread = threading.Thread(target=run_analyze_task, args=(slug,))
+    thread.start()
+    return jsonify({"message": f"Analysis started for {slug}"}), 202
+
+@app.route('/api/status', methods=['GET'])
+def get_status():
+    slug = request.args.get('contest_slug')
+    if not slug or slug not in task_status:
+        # Return default idle structure if slug not found/provided for safety
+        return jsonify({
+            "fetch": {"status": "idle", "message": ""},
+            "analyze": {"status": "idle", "message": ""}
+        })
+    return jsonify(task_status[slug])
+
+@app.route('/api/results', methods=['GET'])
+def get_results():
+    slug = request.args.get('contest_slug')
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+
+    try:
+        threshold = float(request.args.get('threshold', 50.0))
+        uf, user_questions = plagiarism_detector.parse_and_cluster(slug, threshold)
+        clusters = uf.get_clusters()
+        user_ranks = plagiarism_detector.load_user_ranks(slug)
+        
+        result = []
+        sorted_clusters = sorted(clusters.items(), key=lambda x: len(x[1]), reverse=True)
+        
+        for _, members in sorted_clusters:
+            if len(members) > 1:
+                involved_qs = set()
+                member_details = []
+                for member in members:
+                    involved_qs.update(user_questions[member])
+                    rank = user_ranks.get(member, "N/A")
+                    member_details.append({"username": member, "rank": rank})
+                
+                # Sort members by rank
+                def rank_key(m):
+                    try: return int(m["rank"])
+                    except: return 999999
+                member_details.sort(key=rank_key)
+
+                result.append({
+                    "size": len(members),
+                    "questions": sorted(list(involved_qs)),
+                    "members": member_details
+                })
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5050)
