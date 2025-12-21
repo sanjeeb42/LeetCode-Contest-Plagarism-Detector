@@ -19,31 +19,26 @@ const variants = {
     }
 };
 
-const ActionCard = ({ title, description, icon: Icon, onClick, status, progress, color, disabled }) => {
+const ActionCard = ({ title, description, icon: Icon, onClick, status, progress, color, disabled, extraAction }) => {
     const styles = variants[color] || variants.blue;
     const isLoading = status === 'running';
     const isSuccess = status === 'success';
 
     return (
-        <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onClick}
-            disabled={isLoading || disabled}
+        <div
             className={clsx(
                 "relative flex flex-col items-start p-6 rounded-2xl border transition-all duration-300 w-full text-left overflow-hidden group",
                 "bg-slate-800/50 backdrop-blur-sm border-white/5 hover:border-white/10",
-                isLoading ? "cursor-wait opacity-80" : "cursor-pointer",
-                disabled && "opacity-50 grayscale cursor-not-allowed",
                 isSuccess && "border-emerald-500/30 bg-emerald-500/5"
             )}
         >
+            {/* Background Overlay */}
             <div className={clsx(
                 "absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500",
                 styles.overlay
             )} />
 
-            <div className="flex justify-between w-full mb-4">
+            <div className="flex justify-between w-full mb-4 relative z-10">
                 <div className={clsx(
                     "p-3 rounded-xl transition-colors scale-100",
                     isSuccess ? "bg-emerald-500/10 text-emerald-400" : styles.iconBox
@@ -68,11 +63,27 @@ const ActionCard = ({ title, description, icon: Icon, onClick, status, progress,
                 )}
             </div>
 
-            <h3 className="text-lg font-bold text-slate-100 mb-1">{title}</h3>
-            <p className="text-sm text-slate-400 leading-relaxed font-medium">{description}</p>
+            <h3 className="text-lg font-bold text-slate-100 mb-1 relative z-10">{title}</h3>
+            <p className="text-sm text-slate-400 leading-relaxed font-medium mb-4 relative z-10">{description}</p>
+
+            <div className="w-full mt-auto relative z-10 flex gap-2">
+                {extraAction}
+                <button
+                    onClick={onClick}
+                    disabled={isLoading || disabled}
+                    className={clsx(
+                        "flex-1 py-2 rounded-lg font-medium transition-colors text-center text-sm",
+                        isLoading ? "bg-slate-700/50 text-slate-400 cursor-wait" :
+                            disabled ? "bg-slate-800 text-slate-600 cursor-not-allowed" :
+                                clsx("hover:text-white", styles.loader.replace("bg-", "bg-").replace("500", "600"), "text-white bg-slate-700")
+                    )}
+                >
+                    {isLoading ? "Running..." : "Start Task"}
+                </button>
+            </div>
 
             {isLoading && (
-                <div className="absolute bottom-0 left-0 w-full h-1 bg-slate-700/50">
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-slate-700/50 z-20">
                     <motion.div
                         className={clsx("h-full", styles.loader)}
                         initial={{ width: 0 }}
@@ -81,7 +92,7 @@ const ActionCard = ({ title, description, icon: Icon, onClick, status, progress,
                     />
                 </div>
             )}
-        </motion.button>
+        </div>
     );
 };
 
@@ -90,6 +101,7 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
         fetch: { status: 'idle', progress: 0 },
         analyze: { status: 'idle', progress: 0 }
     });
+    const [pageLimit, setPageLimit] = useState(10);
 
     const pollStatus = async (taskName) => {
         const interval = setInterval(async () => {
@@ -122,11 +134,11 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
         }, 1000);
     };
 
-    const triggerTask = async (task, endpoint) => {
+    const triggerTask = async (task, endpoint, payload = {}) => {
         setTaskStatus(prev => ({ ...prev, [task]: { status: 'running', progress: 0 } }));
 
         try {
-            await axios.post(`http://127.0.0.1:5050/api/${endpoint}`, { contest_slug: contestSlug });
+            await axios.post(`http://127.0.0.1:5050/api/${endpoint}`, { contest_slug: contestSlug, ...payload });
             pollStatus(task);
         } catch (error) {
             console.error(error);
@@ -144,7 +156,20 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
                 color="blue"
                 status={taskStatus.fetch.status}
                 progress={taskStatus.fetch.progress}
-                onClick={() => triggerTask('fetch', 'fetch')}
+                onClick={() => triggerTask('fetch', 'fetch', { limit: pageLimit })}
+                extraAction={
+                    <div className="flex flex-col w-24">
+                        <label className="text-[10px] text-slate-500 font-mono mb-1">PAGES (1≈25U)</label>
+                        <input
+                            type="number"
+                            min="1"
+                            max="500"
+                            value={pageLimit}
+                            onChange={(e) => setPageLimit(parseInt(e.target.value) || 1)}
+                            className="bg-slate-900 border border-slate-700 rounded text-white text-sm px-2 py-1 outline-none focus:border-blue-500"
+                        />
+                    </div>
+                }
             />
 
             <ActionCard

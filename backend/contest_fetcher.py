@@ -19,26 +19,73 @@ def get_paths(contest_slug):
     output_dir = os.path.join("resources", f"contest_report_{contest_slug}")
     raw_json_file = os.path.join(output_dir, "raw_data.json")
     report_file = os.path.join(output_dir, "submission_matrix.csv")
-    return output_dir, raw_json_file, report_file
+    meta_file = os.path.join(output_dir, "fetch_meta.json")
+    return output_dir, raw_json_file, report_file, meta_file
 
-def fetch_contest_data(session, contest_slug):
-    """Fetches the parallel array structure from LeetCode."""
-    url = f"https://leetcode.com/contest/api/ranking/{contest_slug}/?pagination=1&region=global"
-    print(f"[*] Fetching live data for {contest_slug}...")
+def save_meta(contest_slug, pages_fetched):
+    """Saves metadata about the fetch operation."""
+    _, _, _, meta_file = get_paths(contest_slug)
+    with open(meta_file, "w") as f:
+        json.dump({"pages_fetched": pages_fetched, "last_fetched": time.time()}, f)
+
+def load_meta(contest_slug):
+    """Loads metadata about the previous fetch operation."""
+    _, _, _, meta_file = get_paths(contest_slug)
+    if os.path.exists(meta_file):
+        try:
+            with open(meta_file, "r") as f:
+                return json.load(f)
+        except: pass
+    return None
+
+def fetch_contest_data(session, contest_slug, page_limit=10, progress_callback=None):
+    """Fetches key data from LeetCode, iterating through pages."""
+    print(f"[*] Fetching live data for {contest_slug} (Limit: {page_limit} pages)...")
     
-    output_dir, raw_json_file, _ = get_paths(contest_slug)
+    output_dir, raw_json_file, _, _ = get_paths(contest_slug)
     os.makedirs(output_dir, exist_ok=True)
 
+    aggregated_data = {
+        "total_rank": [],
+        "submissions": [],
+        "questions": []
+    }
+
     try:
-        # impersonate="chrome" handles the TLS fingerprinting to bypass 403
-        resp = session.get(url, timeout=30)
-        if resp.status_code == 200:
-            data = resp.json()
-            with open(raw_json_file, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4)
-            return data
-        else:
-            print(f"!! Failed with status: {resp.status_code}")
+        for page in range(1, page_limit + 1):
+            url = f"https://leetcode.com/contest/api/ranking/{contest_slug}/?pagination={page}&region=global"
+            resp = session.get(url, timeout=30)
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                
+                # On first page, grab questions
+                if page == 1:
+                    aggregated_data["questions"] = data.get("questions", [])
+                
+                aggregated_data["total_rank"].extend(data.get("total_rank", []))
+                aggregated_data["submissions"].extend(data.get("submissions", []))
+                
+                print(f"    Fetched page {page}/{page_limit}")
+                if progress_callback:
+                    # Allocate first 40% of progress to ranking fetch
+                    # percent = (page / page_limit) * 40
+                    pass
+            else:
+                print(f"!! Failed page {page} with status: {resp.status_code}")
+                # If a page fails, we might want to stop or continue. 
+                # For now, let's stop to avoid partial/corrupt states
+                break
+            
+            # Gentle pacing
+            time.sleep(0.2)
+            
+        # Save aggregated raw data
+        with open(raw_json_file, "w", encoding="utf-8") as f:
+            json.dump(aggregated_data, f, indent=4)
+            
+        return aggregated_data
+
     except Exception as e:
         print(f"!! Network Error: {e}")
     return None
@@ -119,7 +166,7 @@ def generate_report(data, session, contest_slug, progress_callback=None):
     """Maps parallel 'total_rank' and 'submissions' arrays to a CSV."""
     print("[*] Generating CSV Report...")
     
-    output_dir, raw_json_file, report_file = get_paths(contest_slug)
+    output_dir, raw_json_file, report_file, _ = get_paths(contest_slug)
     
     # Load Cache
     cache = load_cache(report_file)
@@ -240,8 +287,17 @@ def generate_report(data, session, contest_slug, progress_callback=None):
     print(f"[✓] Success! Report saved to: {report_file}")
     return True
 
-def run_data_collection(contest_slug, progress_callback=None):
+def run_data_collection(contest_slug, progress_callback=None, page_limit=10):
     """Main execution function for data collection."""
+    
+    # Check Cache
+    meta = load_meta(contest_slug)
+    if meta and meta.get("pages_fetched", 0) >= page_limit:
+        print(f"[SKIP] Already fetched {meta['pages_fetched']} pages. Requested {page_limit}. Using cache.")
+        if progress_callback:
+            progress_callback(100)
+        return True
+
     # Session setup
     with requests.Session(impersonate="chrome") as session:
         session.headers.update({
@@ -267,10 +323,12 @@ def run_data_collection(contest_slug, progress_callback=None):
 
         session.headers.update({"Referer": "https://leetcode.com/"})
 
-        data = fetch_contest_data(session, contest_slug)
+        data = fetch_contest_data(session, contest_slug, page_limit, progress_callback)
         if data:
-            generate_report(data, session, contest_slug, progress_callback)
-            return True
+            if generate_report(data, session, contest_slug, progress_callback):
+                save_meta(contest_slug, page_limit)
+                return True
+            return False
         else:
             print("!! Pipeline failed at data collection stage.")
             return False

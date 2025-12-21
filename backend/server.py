@@ -40,14 +40,14 @@ def init_task_status(slug):
             "analyze": {"status": "idle", "message": "", "progress": 0}
         }
 
-def run_fetch_task(slug):
+def run_fetch_task(slug, limit=10):
     global task_status
     # Status is already set to running by the triggering endpoint
     try:
         def update_progress(p):
             task_status[slug]["fetch"]["progress"] = p
             
-        success = data_collector.run_data_collection(slug, progress_callback=update_progress)
+        success = data_collector.run_data_collection(slug, progress_callback=update_progress, page_limit=limit)
         if success:
             task_status[slug]["fetch"] = {"status": "success", "message": "Data collection complete.", "progress": 100}
         else:
@@ -91,7 +91,8 @@ def trigger_fetch():
     # Synchronous update to avoid race condition
     task_status[slug]["fetch"] = {"status": "running", "message": "Starting fetch...", "progress": 0}
 
-    thread = threading.Thread(target=run_fetch_task, args=(slug,))
+    limit = int(data.get("limit", 10))
+    thread = threading.Thread(target=run_fetch_task, args=(slug, limit))
     thread.start()
     return jsonify({"message": f"Fetch started for {slug}"}), 202
 

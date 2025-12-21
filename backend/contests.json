@@ -40,8 +40,13 @@
         "slug": "weekly-contest-477"
     },
     {
+        "color": "amber",
         "name": "Biweekly Contest 170",
-        "slug": "biweekly-contest-170",
+        "slug": "biweekly-contest-170"
+    },
+    {
+        "name": "Weekly Contest 476",
+        "slug": "weekly-contest-476",
         "color": "amber"
     }
 ]
