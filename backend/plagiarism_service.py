@@ -162,6 +162,35 @@ def export_submissions(contest_slug):
     print(f"[✓] Export complete.")
     return questions_languages
 
+def get_submission_code(contest_slug, question_id, username):
+    _, _, submissions_dir, _ = get_paths(contest_slug)
+    # Expected path: submissions_dir/Q#/lang/username.ext
+    # We need to find the language and extension
+    
+    q_dir_base = os.path.join(submissions_dir, question_id)
+    if not os.path.exists(q_dir_base):
+        return None
+        
+    # Search all language subdirectories
+    for lang in os.listdir(q_dir_base):
+        lang_dir = os.path.join(q_dir_base, lang)
+        if not os.path.isdir(lang_dir): continue
+        
+        # Check for user file with any allowed extension
+        # Common extensions based on export logic: .java, .cpp, .py, .txt
+        possible_exts = ["java", "cpp", "py", "txt"]
+        
+        for ext in possible_exts:
+            file_path = os.path.join(lang_dir, f"{username}.{ext}")
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        return f.read()
+                except Exception as e:
+                    print(f"Error reading file {file_path}: {e}")
+                    return None
+    return None
+
 def run_jplag(contest_slug, questions_languages):
     print("[*] Running JPlag...")
     _, _, submissions_dir, jplag_results_dir = get_paths(contest_slug)

@@ -3,57 +3,77 @@ import { User, AlertTriangle, ShieldCheck, Code, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
-const ClusterCard = ({ cluster, index }) => (
-    <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3, delay: index * 0.05 }}
-        className="glass-card rounded-2xl p-6 relative group overflow-hidden"
-    >
-        {/* Decorative Glow */}
-        <div className="absolute top-0 right-0 p-20 bg-rose-500/10 blur-[60px] rounded-full -mr-10 -mt-10" />
+import { useNavigate, useParams } from 'react-router-dom';
 
-        <div className="flex justify-between items-start mb-6 relative">
-            <div>
-                <span className="text-xs font-bold tracking-[0.2em] text-rose-400 uppercase mb-1 block">
-                    Cluster ID #{index + 1}
-                </span>
-                <div className="flex items-center gap-2">
-                    <span className="text-3xl font-bold text-white">{cluster.size}</span>
-                    <span className="text-sm font-medium text-slate-400">Suspects</span>
+const ClusterCard = ({ cluster, index, activeTab }) => {
+    const navigate = useNavigate();
+    const { slug } = useParams();
+
+    const handleClick = () => {
+        navigate(`/contest/${slug}/cluster/${activeTab}`, {
+            state: {
+                cluster: cluster,
+                clusterIndex: index
+            }
+        });
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: index * 0.05 }}
+            whileHover={{ scale: 1.02 }}
+            onClick={handleClick}
+            className="glass-card rounded-2xl p-6 relative group overflow-hidden cursor-pointer border border-white/5 hover:border-sky-500/50 transition-all"
+        >
+            {/* Decorative Glow */}
+            <div className="absolute top-0 right-0 p-20 bg-rose-500/10 blur-[60px] rounded-full -mr-10 -mt-10 group-hover:bg-rose-500/20 transition-all" />
+
+            <div className="flex justify-between items-start mb-6 relative">
+                <div>
+                    <span className="text-xs font-bold tracking-[0.2em] text-rose-400 uppercase mb-1 block">
+                        Cluster ID #{index + 1}
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-3xl font-bold text-white">{cluster.size}</span>
+                        <span className="text-sm font-medium text-slate-400">Suspects</span>
+                    </div>
+                </div>
+                <div className="bg-rose-500/10 p-2 rounded-lg border border-rose-500/20 group-hover:bg-rose-500/20 transition-colors">
+                    <AlertTriangle className="w-5 h-5 text-rose-400" />
                 </div>
             </div>
-            <div className="bg-rose-500/10 p-2 rounded-lg border border-rose-500/20">
-                <AlertTriangle className="w-5 h-5 text-rose-400" />
-            </div>
-        </div>
 
-        <div>
-            <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                <User className="w-3 h-3" />
-                <span>Identities</span>
+            <div>
+                <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <User className="w-3 h-3" />
+                    <span>Identities</span>
+                </div>
+                <div className="space-y-2">
+                    {cluster.members.slice(0, 5).map((member, i) => (
+                        <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-slate-800/50 last:border-0">
+                            <span className="text-slate-300 font-medium">{member.username}</span>
+                            <span className={clsx(
+                                "text-xs font-mono",
+                                member.rank !== 'N/A' ? "text-amber-400" : "text-slate-600"
+                            )}>
+                                {member.rank !== 'N/A' ? `#${member.rank}` : 'UNRANKED'}
+                            </span>
+                        </div>
+                    ))}
+                    {cluster.members.length > 5 && (
+                        <div className="text-xs text-center text-slate-500 pt-2 italic">
+                            + {cluster.members.length - 5} others
+                        </div>
+                    )}
+                </div>
             </div>
-            <div className="space-y-2">
-                {cluster.members.slice(0, 5).map((member, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-slate-800/50 last:border-0">
-                        <span className="text-slate-300 font-medium">{member.username}</span>
-                        <span className={clsx(
-                            "text-xs font-mono",
-                            member.rank !== 'N/A' ? "text-amber-400" : "text-slate-600"
-                        )}>
-                            {member.rank !== 'N/A' ? `#${member.rank}` : 'UNRANKED'}
-                        </span>
-                    </div>
-                ))}
-                {cluster.members.length > 5 && (
-                    <div className="text-xs text-center text-slate-500 pt-2 italic">
-                        + {cluster.members.length - 5} others
-                    </div>
-                )}
-            </div>
-        </div>
-    </motion.div>
-);
+
+            <div className="absolute inset-0 bg-sky-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </motion.div>
+    );
+};
 
 const ResultsDashboard = ({ clusters }) => {
     // clusters is now an object: { "Q1": [...], "Q2": [...] }
@@ -127,7 +147,7 @@ const ResultsDashboard = ({ clusters }) => {
                         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                     >
                         {currentClusters.map((cluster, idx) => (
-                            <ClusterCard key={idx} cluster={cluster} index={idx} />
+                            <ClusterCard key={idx} cluster={cluster} index={idx} activeTab={activeTab} />
                         ))}
                     </motion.div>
                 ) : (

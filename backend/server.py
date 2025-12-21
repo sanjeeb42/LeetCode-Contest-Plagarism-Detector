@@ -176,6 +176,22 @@ def get_results():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/submission_code', methods=['POST'])
+def get_submission_code():
+    data = request.json
+    slug = data.get("contest_slug")
+    question_id = data.get("question_id")
+    username = data.get("username")
+    
+    if not all([slug, question_id, username]):
+        return jsonify({"error": "Missing required fields"}), 400
+        
+    code = plagiarism_detector.get_submission_code(slug, question_id, username)
+    if code:
+        return jsonify({"code": code})
+    else:
+        return jsonify({"error": "Code not found"}), 404
+
 @app.route('/api/export', methods=['GET'])
 def export_results():
     slug = request.args.get('contest_slug')
