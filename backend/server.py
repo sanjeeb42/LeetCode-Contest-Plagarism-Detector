@@ -137,6 +137,7 @@ def get_results():
         # Now returns a dict: { "Q1": UnionFind, "Q2": UnionFind... }
         question_ufs = plagiarism_detector.parse_and_cluster(slug, threshold)
         user_ranks = plagiarism_detector.load_user_ranks(slug)
+        user_slugs = plagiarism_detector.load_user_slugs(slug)
         
         # Structure: { "Q1": [ {size, members: []} ], "Q2": ... }
         results_by_question = {}
@@ -156,7 +157,8 @@ def get_results():
                     member_details = []
                     for member in members:
                         rank = user_ranks.get(member, "N/A")
-                        member_details.append({"username": member, "rank": rank})
+                        uslug = user_slugs.get(member, member)
+                        member_details.append({"username": member, "rank": rank, "slug": uslug})
                     
                     # Sort members by rank
                     def rank_key(m):

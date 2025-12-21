@@ -188,6 +188,7 @@ def generate_report(data, session, contest_slug, progress_callback=None):
 
     for rank_entry, sub_entry in zip(total_rank, submissions_list):
         username = rank_entry.get("username")
+        slug = rank_entry.get("user_slug") or username
         rank = rank_entry.get("rank")
         
         # Check for CN region
@@ -210,6 +211,7 @@ def generate_report(data, session, contest_slug, progress_callback=None):
                  
         users_data.append({
             "username": username,
+            "slug": slug,
             "rank": rank,
             "submissions": user_submissions
         })
@@ -259,7 +261,7 @@ def generate_report(data, session, contest_slug, progress_callback=None):
     with open(report_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
 
-        header = ["user", "rank"]
+        header = ["user", "slug", "rank"]
         for i in range(1, num_questions + 1):
             header.append(f"question{i}_id")
         for i in range(1, num_questions + 1):
@@ -267,7 +269,7 @@ def generate_report(data, session, contest_slug, progress_callback=None):
         writer.writerow(header)
 
         for i, u_data in enumerate(users_data):
-            row = [u_data["username"], u_data["rank"]]
+            row = [u_data["username"], u_data["slug"], u_data["rank"]]
             
             # IDs
             for q_id in q_ids:

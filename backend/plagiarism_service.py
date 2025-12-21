@@ -79,6 +79,17 @@ def load_user_ranks(contest_slug):
                 ranks[row["user"]] = row["rank"]
     return ranks
 
+def load_user_slugs(contest_slug):
+    _, csv_file, _, _ = get_paths(contest_slug)
+    slugs = {}
+    if os.path.exists(csv_file):
+        with open(csv_file, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Fallback to user if slug missing (for backward compatibility)
+                slugs[row["user"]] = row.get("slug", row["user"])
+    return slugs
+
 def load_user_submission_ids(contest_slug):
     _, csv_file, _, _ = get_paths(contest_slug)
     # Returns { user: { "Q1": sub_id, "Q2": sub_id... } }
