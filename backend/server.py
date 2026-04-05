@@ -190,9 +190,41 @@ def get_submission_code():
         
     code = plagiarism_detector.get_submission_code(slug, question_id, username)
     if code:
-        return jsonify({"code": code})
+        # Detect language (simple guess or pass based on file ext logic if we had it)
+        # For now, simplistic detection based on content
+        lang = "text"
+        if "def " in code: lang = "python3"
+        elif "public class" in code: lang = "java"
+        elif "#include" in code: lang = "cpp"
+        
+        analysis = plagiarism_detector.analyze_ai_likelihood(code, lang)
+        return jsonify({
+            "code": code,
+            "ai_analysis": analysis
+        })
     else:
         return jsonify({"error": "Code not found"}), 404
+
+@app.route('/api/reference', methods=['GET', 'POST'])
+def manage_references():
+    if request.method == 'GET':
+        slug = request.args.get("contest_slug")
+        if not slug: return jsonify({"error": "Missing slug"}), 400
+        refs = plagiarism_detector.get_saved_references(slug)
+        return jsonify(refs)
+        
+    if request.method == 'POST':
+        data = request.json
+        slug = data.get("contest_slug")
+        q_id = data.get("question_id") # Expected "Q1", "Q2"
+        lang = data.get("language")
+        code = data.get("code")
+        
+        if not all([slug, q_id, lang, code]):
+            return jsonify({"error": "Missing fields"}), 400
+            
+        success = plagiarism_detector.save_reference_code(slug, q_id, lang, code)
+        return jsonify({"success": success})
 
 @app.route('/api/export', methods=['GET'])
 def export_results():

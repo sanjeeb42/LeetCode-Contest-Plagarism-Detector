@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { User, AlertTriangle, ShieldCheck, Code, Zap } from 'lucide-react';
+import { Users, AlertTriangle, ShieldCheck, Code, Zap, Hash, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
@@ -18,60 +18,73 @@ const ClusterCard = ({ cluster, index, activeTab }) => {
         });
     };
 
+    // Check if this cluster contains the AI Reference
+    const hasAIReference = cluster.members.some(m => m.username.includes('_AI_REFERENCE_'));
+
     return (
         <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: index * 0.05 }}
-            whileHover={{ scale: 1.02 }}
+            layoutId={`cluster-${activeTab}-${index}`}
             onClick={handleClick}
-            className="glass-card rounded-2xl p-6 relative group overflow-hidden cursor-pointer border border-white/5 hover:border-sky-500/50 transition-all"
+            className={clsx(
+                "group relative bg-slate-900/50 backdrop-blur-sm rounded-xl border p-5 transition-all cursor-pointer hover:shadow-2xl hover:shadow-sky-500/10 hover:-translate-y-1",
+                hasAIReference
+                    ? "border-red-500/50 bg-red-500/5 hover:border-red-500"
+                    : "border-white/10 hover:border-sky-500/50 hover:bg-slate-800/50"
+            )}
         >
-            {/* Decorative Glow */}
-            <div className="absolute top-0 right-0 p-20 bg-rose-500/10 blur-[60px] rounded-full -mr-10 -mt-10 group-hover:bg-rose-500/20 transition-all" />
+            {hasAIReference && (
+                <div className="absolute -top-3 -right-3 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg border border-red-400 flex items-center gap-1 z-10 animate-pulse">
+                    <AlertTriangle className="w-3 h-3" />
+                    AI MATCH
+                </div>
+            )}
 
-            <div className="flex justify-between items-start mb-6 relative">
-                <div>
-                    <span className="text-xs font-bold tracking-[0.2em] text-rose-400 uppercase mb-1 block">
-                        Cluster ID #{index + 1}
-                    </span>
-                    <div className="flex items-center gap-2">
-                        <span className="text-3xl font-bold text-white">{cluster.size}</span>
-                        <span className="text-sm font-medium text-slate-400">Suspects</span>
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={clsx("p-2.5 rounded-lg", hasAIReference ? "bg-red-500/20" : "bg-sky-500/20")}>
+                        <Users className={clsx("w-5 h-5", hasAIReference ? "text-red-400" : "text-sky-400")} />
+                    </div>
+                    <div>
+                        <h3 className="text-white font-bold text-lg leading-tight">Cluster #{index + 1}</h3>
+                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                            <Hash className="w-3 h-3" />
+                            <span className="font-mono">ID: {Math.random().toString(36).substr(2, 6).toUpperCase()}</span>
+                        </div>
                     </div>
                 </div>
-                <div className="bg-rose-500/10 p-2 rounded-lg border border-rose-500/20 group-hover:bg-rose-500/20 transition-colors">
-                    <AlertTriangle className="w-5 h-5 text-rose-400" />
+                <div className="text-right">
+                    <div className="text-2xl font-bold text-white leading-none">{cluster.size}</div>
+                    <div className="text-[10px] font-bold text-slate-500 tracking-wider mt-1">MEMBERS</div>
                 </div>
             </div>
 
-            <div>
-                <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    <User className="w-3 h-3" />
-                    <span>Identities</span>
-                </div>
-                <div className="space-y-2">
-                    {cluster.members.slice(0, 5).map((member, i) => (
-                        <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-slate-800/50 last:border-0">
-                            <span className="text-slate-300 font-medium">{member.username}</span>
-                            <span className={clsx(
-                                "text-xs font-mono",
-                                member.rank !== 'N/A' ? "text-amber-400" : "text-slate-600"
-                            )}>
-                                {member.rank !== 'N/A' ? `#${member.rank}` : 'UNRANKED'}
+            <div className="space-y-2 mb-4">
+                {cluster.members.slice(0, 3).map((member, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm p-2 rounded-lg bg-black/20 border border-white/5">
+                        <div className="flex items-center gap-2">
+                            {member.username.includes('_AI_REFERENCE_') ? (
+                                <Bot className="w-3 h-3 text-red-500" />
+                            ) : (
+                                <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
+                            )}
+                            <span className={clsx("font-mono truncate max-w-[120px]", member.username.includes('_AI_REFERENCE_') ? "text-red-400 font-bold" : "text-slate-300")}>
+                                {member.username.replace('_AI_REFERENCE_', 'AI Graph')}
                             </span>
                         </div>
-                    ))}
-                    {cluster.members.length > 5 && (
-                        <div className="text-xs text-center text-slate-500 pt-2 italic">
-                            + {cluster.members.length - 5} others
-                        </div>
-                    )}
-                </div>
+                        <span className={clsx("font-mono text-xs", member.rank === "N/A" ? "text-slate-600" : "text-emerald-400")}>
+                            {member.rank !== "N/A" ? `#${member.rank}` : "Ref"}
+                        </span>
+                    </div>
+                ))}
             </div>
+            {cluster.members.length > 5 && (
+                <div className="text-xs text-center text-slate-500 pt-2 italic">
+                    + {cluster.members.length - 5} others
+                </div>
+            )}
 
             <div className="absolute inset-0 bg-sky-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        </motion.div>
+        </motion.div >
     );
 };
 

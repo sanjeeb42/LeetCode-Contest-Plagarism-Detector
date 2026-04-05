@@ -3,7 +3,8 @@ import axios from 'axios';
 import { useParams, Link } from 'react-router-dom';
 import ControlPanel from '../components/ControlPanel';
 import ResultsDashboard from '../components/ResultsDashboard';
-import { ShieldAlert, Activity, Cpu, ArrowLeft, Loader2 } from 'lucide-react';
+import ReferenceManager from '../components/ReferenceManager';
+import { ShieldAlert, Activity, Cpu, ArrowLeft, Loader2, Bot, Download } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 function ContestDashboard() {
@@ -12,6 +13,9 @@ function ContestDashboard() {
     const [clusters, setClusters] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    // UI State
+    const [showReferenceManager, setShowReferenceManager] = useState(false);
+
     const fetchReport = useCallback(async () => {
         setLoading(true);
         try {
@@ -19,7 +23,6 @@ function ContestDashboard() {
             setClusters(resp.data);
         } catch (error) {
             console.error("Failed to fetch results:", error);
-            // If error (likely no data yet), clear clusters
             setClusters([]);
         } finally {
             setLoading(false);
@@ -29,6 +32,10 @@ function ContestDashboard() {
     useEffect(() => {
         fetchReport();
     }, [fetchReport]);
+
+    const handleExport = () => {
+        window.location.href = `http://127.0.0.1:5050/api/export?contest_slug=${slug}&threshold=${threshold}`;
+    };
 
     return (
         <div className="min-h-screen bg-transparent relative z-10">
@@ -54,6 +61,15 @@ function ContestDashboard() {
                     </div>
 
                     <div className="flex items-center gap-6">
+                        {/* Reference Manager Button */}
+                        <button
+                            onClick={() => setShowReferenceManager(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg border border-indigo-500/20 hover:bg-indigo-500/20 transition-all font-medium text-sm"
+                        >
+                            <Bot className="w-4 h-4" />
+                            <span>AI References</span>
+                        </button>
+
                         <div className="hidden md:flex flex-col items-end">
                             <span className="text-xs text-slate-500 font-mono">CONFIDENCE</span>
                             <span className="text-2xl font-bold font-mono text-sky-400">{threshold}%</span>
@@ -69,10 +85,10 @@ function ContestDashboard() {
                             />
                         </div>
                         <button
-                            onClick={() => window.location.href = `http://127.0.0.1:5050/api/export?contest_slug=${slug}&threshold=${threshold}`}
+                            onClick={handleExport}
                             className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-white/5 flex items-center gap-2"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                            <Download className="w-4 h-4" />
                             Export
                         </button>
                     </div>
@@ -107,6 +123,14 @@ function ContestDashboard() {
                     <ResultsDashboard clusters={clusters} />
                 )}
             </main>
+
+            {/* Reference Manager Modal */}
+            {showReferenceManager && (
+                <ReferenceManager
+                    contestSlug={slug}
+                    onClose={() => setShowReferenceManager(false)}
+                />
+            )}
         </div>
     );
 }
