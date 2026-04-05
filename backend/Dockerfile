@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM python:3.9-slim
+FROM python:3.9-slim-bookworm
 
 # Install OpenJDK 17 for JPlag
 RUN apt-get update && \
