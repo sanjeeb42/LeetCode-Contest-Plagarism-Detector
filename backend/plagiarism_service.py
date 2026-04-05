@@ -5,6 +5,7 @@ import requests
 import shutil
 import re
 from collections import defaultdict
+import s3_storage_service as s3
 
 # --- CONFIGURATION ---
 JPLAG_JAR = "jplag.jar"
@@ -287,6 +288,10 @@ def save_reference_code(contest_slug, question_id, language, code):
     file_path = os.path.join(target_dir, f"_AI_REFERENCE_.{ext}")
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(code)
+        
+    # Cloud sync folder
+    output_dir, _, _, _ = get_paths(contest_slug)
+    s3.upload_directory(output_dir)
     return True
 
 def get_saved_references(contest_slug):
@@ -469,6 +474,11 @@ def run_pipeline(contest_slug):
         
     question_ufs = parse_and_cluster(contest_slug, 50.0)
     generate_plagiarism_report(contest_slug, question_ufs)
+    
+    # Cloud sync folder
+    output_dir, _, _, _ = get_paths(contest_slug)
+    s3.upload_directory(output_dir)
+    
     return True
 
 if __name__ == "__main__":

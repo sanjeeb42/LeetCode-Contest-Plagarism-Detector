@@ -5,6 +5,7 @@ import json
 import os
 import contest_fetcher as data_collector
 import plagiarism_service as plagiarism_detector
+import s3_storage_service as s3
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -32,6 +33,9 @@ def load_contests():
 def save_contests(contests):
     with open(CONTESTS_FILE, "w") as f:
         json.dump(contests, f, indent=4)
+    
+    # Cloud sync
+    s3.upload_file(CONTESTS_FILE)
 
 def init_task_status(slug):
     if slug not in task_status:
@@ -276,5 +280,8 @@ def export_results():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    # Initial Cloud Sync Sync
+    s3.download_all()
+    
     port = int(os.environ.get('PORT', 5050))
     app.run(host='0.0.0.0', port=port, debug=False)

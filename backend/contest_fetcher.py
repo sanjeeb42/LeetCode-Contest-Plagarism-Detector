@@ -7,6 +7,7 @@ import random
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from curl_cffi import requests
+import s3_storage_service as s3
 
 # 1. Setup & Silence Warnings
 warnings.filterwarnings("ignore")
@@ -329,6 +330,11 @@ def run_data_collection(contest_slug, progress_callback=None, page_limit=10):
         if data:
             if generate_report(data, session, contest_slug, progress_callback):
                 save_meta(contest_slug, page_limit)
+                
+                # Cloud sync folder
+                output_dir, _, _, _ = get_paths(contest_slug)
+                s3.upload_directory(output_dir)
+                
                 return True
             return False
         else:
