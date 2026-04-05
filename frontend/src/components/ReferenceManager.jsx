@@ -29,7 +29,7 @@ export default function ReferenceManager({ contestSlug, onClose }) {
     const fetchReferences = async () => {
         try {
             setLoading(true);
-            const resp = await axios.get(`http://127.0.0.1:5050/api/reference?contest_slug=${contestSlug}`);
+            const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/reference?contest_slug=${contestSlug}`);
             setReferences(resp.data);
         } catch (err) {
             console.error(err);
@@ -42,7 +42,7 @@ export default function ReferenceManager({ contestSlug, onClose }) {
         if (!code.trim()) return;
         setSubmitting(true);
         try {
-            await axios.post('http://127.0.0.1:5050/api/reference', {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/reference`, {
                 contest_slug: contestSlug,
                 question_id: selectedQ,
                 language: selectedLang,

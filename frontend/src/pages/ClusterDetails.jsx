@@ -31,7 +31,7 @@ function ClusterDetails() {
 
         setLoadingCodes(prev => ({ ...prev, [username]: true }));
         try {
-            const resp = await axios.post('http://127.0.0.1:5050/api/submission_code', {
+            const resp = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/submission_code`, {
                 contest_slug: slug,
                 question_id: questionId,
                 username: username

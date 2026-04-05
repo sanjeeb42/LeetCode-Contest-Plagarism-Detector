@@ -15,7 +15,7 @@ function Home() {
     useEffect(() => {
         const fetchContests = async () => {
             try {
-                const resp = await axios.get('http://127.0.0.1:5050/api/contests');
+                const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/contests`);
                 setContests(resp.data);
             } catch (error) {
                 console.error("Failed to load contests", error);
@@ -29,7 +29,7 @@ function Home() {
     // Save changes to backend
     const saveContests = async (updatedContests) => {
         try {
-            await axios.post('http://127.0.0.1:5050/api/contests', updatedContests);
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/contests`, updatedContests);
         } catch (error) {
             console.error("Failed to save contests", error);
         }
