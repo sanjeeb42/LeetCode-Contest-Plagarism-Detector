@@ -1,4 +1,6 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
+import rating_fetcher
+import io
 from flask_cors import CORS
 import threading
 import json
@@ -229,6 +231,45 @@ def manage_references():
             
         success = plagiarism_detector.save_reference_code(slug, q_id, lang, code)
         return jsonify({"success": success})
+
+@app.route('/api/generate_report', methods=['POST'])
+def generate_report():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    
+    if file:
+        input_bytes = file.read()
+        
+        print("\n--- INCOMING SHEET UPLOAD ---")
+        print(f"Filename: {file.filename}")
+        try:
+            decoded_text = input_bytes.decode('utf-8', errors='replace')
+            lines = decoded_text.splitlines()
+            print(f"Total lines: {len(lines)}")
+            print("First 5 lines:")
+            for i, line in enumerate(lines[:5]):
+                print(f"  {i+1}: {line}")
+        except Exception as e:
+            print("Could not print preview:", e)
+        print("-----------------------------\n")
+        
+        # Process entirely in memory (Don't save anywhere)
+        try:
+            output_bytes = rating_fetcher.process_csv_in_memory(input_bytes)
+            
+            return send_file(
+                io.BytesIO(output_bytes),
+                mimetype='text/csv',
+                as_attachment=True,
+                download_name=f"output_{file.filename}"
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": str(e)}), 500
 
 @app.route('/api/export', methods=['GET'])
 def export_results():

@@ -99,6 +99,12 @@ function Home() {
                     <Plus className="w-4 h-4" />
                     Add Contest
                 </button>
+                <Link
+                    to="/generate-report"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-all font-medium text-sm"
+                >
+                    Generate Report
+                </Link>
             </div>
 
             <AnimatePresence>
