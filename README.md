@@ -36,7 +36,7 @@
 
 ## 🚀 Live Demo & Deployment
 
-You can use the live frontend directly here: **[LeetCode Detective via Vercel](https://leetcode-contest-plagarism-detector.vercel.app/)**
+You can use the live frontend directly here: **[LeetCode Detective via Vercel](https://leetcode-contest-plagarism-detector.vercel.app/)  Please allow sometime for the backend on render to boot for first time (~ 2 minutes) **
 
 ### Want to deploy your own?
 1. **Frontend**: Import the `frontend` folder to Vercel and set `VITE_API_URL` to your backend URL.
