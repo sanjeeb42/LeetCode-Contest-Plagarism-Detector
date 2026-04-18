@@ -166,8 +166,7 @@ def export_submissions(contest_slug):
                     os.makedirs(q_dir, exist_ok=True)
                     
                     questions_languages[q_group].add(lang)
-                    import urllib.parse
-                    safe_username = urllib.parse.quote(username, safe='')
+                    safe_username = username.encode('utf-8').hex()
                     file_path = os.path.join(q_dir, f"{safe_username}.{ext}")
                     with open(file_path, "w", encoding="utf-8") as out_f:
                         out_f.write(code)
@@ -193,8 +192,7 @@ def get_submission_code(contest_slug, question_id, username):
         # Common extensions based on export logic: .java, .cpp, .py, .txt
         possible_exts = ["java", "cpp", "py", "txt"]
         
-        import urllib.parse
-        safe_username = urllib.parse.quote(username, safe='')
+        safe_username = username.encode('utf-8').hex()
         for ext in possible_exts:
             file_path = os.path.join(lang_dir, f"{safe_username}.{ext}")
             if os.path.exists(file_path):
@@ -415,8 +413,10 @@ def parse_and_cluster(contest_slug, threshold=50.0):
                             
                             user1_file = parts[0]
                             u1_safe = user1_file.rsplit('.', 1)[0]
-                            import urllib.parse
-                            u1 = urllib.parse.unquote(u1_safe)
+                            try:
+                                u1 = bytes.fromhex(u1_safe).decode('utf-8')
+                            except Exception:
+                                u1 = u1_safe
                             
                             idx = 1
                             while idx + 2 < len(parts):
@@ -430,8 +430,10 @@ def parse_and_cluster(contest_slug, threshold=50.0):
                                 try:
                                     score = float(score_str)
                                     u2_safe = user2_file.rsplit('.', 1)[0]
-                                    import urllib.parse
-                                    u2 = urllib.parse.unquote(u2_safe)
+                                    try:
+                                        u2 = bytes.fromhex(u2_safe).decode('utf-8')
+                                    except Exception:
+                                        u2 = u2_safe
                                     
                                     if score >= threshold:
                                         # Union in the specific question's UF
