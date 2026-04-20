@@ -321,8 +321,8 @@ def export_results():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    # Initial Cloud Sync Sync
-    s3.download_all()
+    # Initial Cloud Sync in background so it doesn't block Render port binding
+    threading.Thread(target=s3.download_all, daemon=True).start()
     
     port = int(os.environ.get('PORT', 5050))
     # Starting Flask server
