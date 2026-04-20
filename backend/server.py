@@ -325,4 +325,5 @@ if __name__ == '__main__':
     s3.download_all()
     
     port = int(os.environ.get('PORT', 5050))
+    # Starting Flask server
     app.run(host='0.0.0.0', port=port, debug=False)
