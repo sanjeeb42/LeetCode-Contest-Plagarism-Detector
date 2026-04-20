@@ -5,9 +5,17 @@ import time
 
 LEETCODE_URL = "https://leetcode.com/graphql"
 QUERY = """
-query ($username: String!) {
+query userProfile($username: String!) {
   userContestRanking(username: $username) {
     rating
+  }
+  matchedUser(username: $username) {
+    submitStats {
+      acSubmissionNum {
+        difficulty
+        count
+      }
+    }
   }
 }
 """
@@ -32,12 +40,23 @@ def get_rating(username):
         time.sleep(0.2)
 
         data = response.json()
+        stats = { "rating": "0", "total_solved": 0 }
+        
         ranking = data.get("data", {}).get("userContestRanking")
         if ranking and ranking.get("rating") is not None:
-             return str(round(ranking.get("rating")))
-        return "0"
+             stats["rating"] = str(round(ranking.get("rating")))
+             
+        matched = data.get("data", {}).get("matchedUser")
+        if matched and matched.get("submitStats"):
+             ac_subs = matched["submitStats"].get("acSubmissionNum", [])
+             for diff in ac_subs:
+                 if diff.get("difficulty") == "All":
+                     stats["total_solved"] = diff.get("count", 0)
+                     break
+                     
+        return stats
     except Exception as e:
-        print(f"Error fetching rating for {username}: {e}")
+        print(f"Error fetching stats for {username}: {e}")
         return None
 
 def process_csv_in_memory(input_bytes):
@@ -58,9 +77,9 @@ def process_csv_in_memory(input_bytes):
         
         # Exact replication of Java logic: replace parts[3]
         if username.lower() not in ["user", "username", "slug", "name"]:
-            rating = get_rating(username)
-            if rating is not None:
-                parts[3] = rating
+            stats = get_rating(username)
+            if stats is not None:
+                parts[3] = stats.get("rating", "0")
             else:
                 parts[3] = "0"
             

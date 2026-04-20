@@ -203,7 +203,7 @@ def get_submission_code():
         elif "public class" in code: lang = "java"
         elif "#include" in code: lang = "cpp"
         
-        analysis = plagiarism_detector.analyze_ai_likelihood(code, lang)
+        analysis = plagiarism_detector.analyze_ai_likelihood(code, lang, username, slug)
         return jsonify({
             "code": code,
             "ai_analysis": analysis

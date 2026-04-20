@@ -204,7 +204,7 @@ def get_submission_code(contest_slug, question_id, username):
                     return None
     return None
 
-def analyze_ai_likelihood(code, language="text"):
+def analyze_ai_likelihood(code, language="text", username=None, contest_slug=None):
     """
     Returns a dict with score (0-100) and reasons.
     """
@@ -258,10 +258,33 @@ def analyze_ai_likelihood(code, language="text"):
             score += 15
             reasons.append("Verbose variable naming")
 
-    return {
-        "score": min(score, 100),
-        "reasons": reasons
-    }
+    # 4. User Profile Anomaly Detection (Smurf / AI Spiking)
+    if username and contest_slug:
+        import rating_fetcher
+        
+        # Load User Ranks to get current rank
+        ranks = load_user_ranks(contest_slug)
+        user_rank_str = ranks.get(username, "999999")
+        try:
+            current_rank = int(user_rank_str)
+        except ValueError:
+            current_rank = 999999
+            
+        stats = rating_fetcher.get_rating(username)
+        if stats:
+            try:
+                hist_rating = int(stats.get("rating", "0"))
+                total_solved = int(stats.get("total_solved", 0))
+                
+                # Check for extreme outlier behavior
+                if current_rank <= 500 and hist_rating < 1700 and total_solved < 100:
+                    score += 65
+                    reasons.append(f"Profile Anomaly: Top {current_rank} rank but only {total_solved} solved & {hist_rating} rating")
+                elif current_rank <= 1000 and hist_rating < 1600 and total_solved < 50:
+                    score += 40
+                    reasons.append(f"Profile Anomaly: Top {current_rank} rank but lacks experience ({total_solved} solved)")
+            except Exception as e:
+                pass
 
     return {
         "score": min(score, 100),
