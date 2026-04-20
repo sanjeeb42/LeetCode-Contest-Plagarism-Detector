@@ -91,7 +91,7 @@ function Home() {
             </div>
 
             <div className="w-full max-w-4xl mb-6 flex justify-end gap-4">
-                {loading && <span className="text-slate-500 text-sm animate-pulse my-auto">Syncing...</span>}
+                {loading && <span className="text-slate-500 text-sm animate-pulse my-auto">Syncing... (Allow up to 2 mins for backend first boot)</span>}
                 <button
                     onClick={() => setIsAdding(!isAdding)}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 transition-all font-medium text-sm"
