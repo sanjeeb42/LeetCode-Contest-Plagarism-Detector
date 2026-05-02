@@ -5,7 +5,7 @@ Follow these steps to deploy your Plagiarism Detector for free.
 Your backend app contains both Python (Flask) and Java (JPlag) components. We have now added a `Dockerfile` that packages both together.
 
 1. Commit your latest code to your **GitHub repository**.
-2. Create an account on a platform that supports Docker deployments, such as [Koyeb](https://www.koyeb.com/) (Recommended) or [Render](https://render.com/).
+2. Create an account on a platform that supports Docker deployments, such as [Render](https://render.com/).
 3. Create a **New Service** (or Web Service) from your GitHub repository.
 4. If prompted for a root directory, optionally specify `backend/` or just make sure it points to the `Dockerfile` inside the `backend` folder.
 5. In the builder settings, select **Deploy from Dockerfile**. 

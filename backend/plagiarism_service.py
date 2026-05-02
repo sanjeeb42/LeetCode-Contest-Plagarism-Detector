@@ -204,10 +204,32 @@ def get_submission_code(contest_slug, question_id, username):
                     return None
     return None
 
+_ai_cache = None
+
 def analyze_ai_likelihood(code, language="text", username=None, contest_slug=None):
     """
     Returns a dict with score (0-100) and reasons.
     """
+    global _ai_cache
+    cache_key = None
+    cache_path = None
+    
+    if username and contest_slug:
+        import hashlib, json
+        cache_path = os.path.join("resources", f"contest_report_{contest_slug}", "ai_cache.json")
+        if _ai_cache is None:
+            if os.path.exists(cache_path):
+                try:
+                    with open(cache_path, "r") as f: _ai_cache = json.load(f)
+                except: _ai_cache = {}
+            else:
+                _ai_cache = {}
+                
+        code_hash = hashlib.md5(code.encode('utf-8')).hexdigest()
+        cache_key = f"{username}_{code_hash}"
+        if cache_key in _ai_cache:
+            return _ai_cache[cache_key]
+
     score = 0
     reasons = []
     
@@ -286,10 +308,18 @@ def analyze_ai_likelihood(code, language="text", username=None, contest_slug=Non
             except Exception as e:
                 pass
 
-    return {
+    result = {
         "score": min(score, 100),
         "reasons": reasons
     }
+    
+    if cache_key and cache_path:
+        _ai_cache[cache_key] = result
+        try:
+            with open(cache_path, "w") as f: json.dump(_ai_cache, f)
+        except: pass
+        
+    return result
 
 def get_references_dir(contest_slug):
     output_dir, _, _, _ = get_paths(contest_slug)

@@ -164,7 +164,21 @@ def get_results():
                     for member in members:
                         rank = user_ranks.get(member, "N/A")
                         uslug = user_slugs.get(member, member)
-                        member_details.append({"username": member, "rank": rank, "slug": uslug})
+                        member_info = {"username": member, "rank": rank, "slug": uslug}
+                        
+                        if q_id in ["Q3", "Q4"]:
+                            code = plagiarism_detector.get_submission_code(slug, q_id, member)
+                            if code:
+                                lang = "text"
+                                if "def " in code: lang = "python3"
+                                elif "public class" in code: lang = "java"
+                                elif "#include" in code: lang = "cpp"
+                                ai_analysis = plagiarism_detector.analyze_ai_likelihood(code, lang, member, slug)
+                                member_info["ai_score"] = ai_analysis["score"]
+                                member_info["is_ai_generated"] = ai_analysis["score"] >= 60
+                                member_info["ai_reasons"] = ai_analysis["reasons"]
+                        
+                        member_details.append(member_info)
                     
                     # Sort members by rank
                     def rank_key(m):
@@ -290,7 +304,7 @@ def export_results():
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Question", "Cluster ID", "Size", "Members (User [Rank])", "Members (User [Submission ID])"])
+        writer.writerow(["Question", "Cluster ID", "Size", "Members (User [Rank])", "Members (User [Submission ID])", "Members (AI Score)"])
 
         sorted_qs = sorted(question_ufs.keys())
 
@@ -304,6 +318,7 @@ def export_results():
                 if len(members) > 1:
                     member_details_rank = []
                     member_details_sub = []
+                    member_details_ai = []
                     
                     for member in members:
                         rank = user_ranks.get(member, "N/A")
@@ -311,8 +326,22 @@ def export_results():
                         
                         sub_id = user_subs.get(member, {}).get(q_id, "N/A")
                         member_details_sub.append(f"{member} [{sub_id}]")
+                        
+                        if q_id in ["Q3", "Q4"]:
+                            code = plagiarism_detector.get_submission_code(slug, q_id, member)
+                            if code:
+                                lang = "text"
+                                if "def " in code: lang = "python3"
+                                elif "public class" in code: lang = "java"
+                                elif "#include" in code: lang = "cpp"
+                                ai_analysis = plagiarism_detector.analyze_ai_likelihood(code, lang, member, slug)
+                                member_details_ai.append(f"{member} [AI: {ai_analysis['score']}]")
+                            else:
+                                member_details_ai.append(f"{member} [AI: N/A]")
+                        else:
+                            member_details_ai.append(f"{member} [N/A]")
                     
-                    writer.writerow([q_id, local_cluster_id, len(members), ", ".join(member_details_rank), ", ".join(member_details_sub)])
+                    writer.writerow([q_id, local_cluster_id, len(members), ", ".join(member_details_rank), ", ".join(member_details_sub), ", ".join(member_details_ai)])
                     local_cluster_id += 1
         
         return Response(output.getvalue(), mimetype="text/csv", headers={"Content-disposition": f"attachment; filename=plagiarism_report_{slug}_{threshold}.csv"})

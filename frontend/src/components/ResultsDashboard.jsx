@@ -70,6 +70,16 @@ const ClusterCard = ({ cluster, index, activeTab }) => {
                             <span className={clsx("font-mono truncate max-w-[120px]", member.username.includes('_AI_REFERENCE_') ? "text-red-400 font-bold" : "text-slate-300")}>
                                 {member.username.replace('_AI_REFERENCE_', 'AI Graph')}
                             </span>
+                            {member.ai_score !== undefined && (
+                                <span className={clsx(
+                                    "ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold border",
+                                    member.is_ai_generated 
+                                        ? "bg-violet-500/20 text-violet-400 border-violet-500/30"
+                                        : "bg-slate-500/20 text-slate-400 border-slate-500/30"
+                                )}>
+                                    AI {member.ai_score}
+                                </span>
+                            )}
                         </div>
                         <span className={clsx("font-mono text-xs", member.rank === "N/A" ? "text-slate-600" : "text-emerald-400")}>
                             {member.rank !== "N/A" ? `#${member.rank}` : "Ref"}
