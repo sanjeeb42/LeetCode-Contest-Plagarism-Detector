@@ -101,12 +101,20 @@ const ClusterCard = ({ cluster, index, activeTab }) => {
 const ResultsDashboard = ({ clusters }) => {
     // clusters is now an object: { "Q1": [...], "Q2": [...] }
     const questions = useMemo(() => Object.keys(clusters || {}).sort(), [clusters]);
-    const [activeTab, setActiveTab] = useState(questions[0] || "Q4");
+    const [activeTab, setActiveTab] = useState(() => {
+        const saved = sessionStorage.getItem('resultsActiveTab');
+        // If saved tab exists but questions aren't loaded yet, we'll still use it
+        return saved || "Q4";
+    });
+
+    React.useEffect(() => {
+        sessionStorage.setItem('resultsActiveTab', activeTab);
+    }, [activeTab]);
 
     // Ensure activeTab is valid when data likely loads/changes
     const currentClusters = clusters?.[activeTab] || [];
 
-    // Auto-select first available tab if activeTab is empty (on first load)
+    // Auto-select first available tab if activeTab is empty or invalid (on first load)
     React.useEffect(() => {
         if (!questions.includes(activeTab) && questions.length > 0) {
             setActiveTab(questions[questions.length - 1]); // Default to Q4 (usually hardest/most interesting)
