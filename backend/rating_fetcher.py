@@ -32,8 +32,17 @@ def get_rating(username):
 
     try:
         # Uses Chrome impersonation to bypass Cloudflare bot checks
-        response = requests.post(LEETCODE_URL, json=json_payload, headers=headers, impersonate="chrome", timeout=10)
-        if response.status_code != 200:
+        response = None
+        for attempt in range(2):
+            try:
+                response = requests.post(LEETCODE_URL, json=json_payload, headers=headers, impersonate="chrome", timeout=15)
+                if response.status_code == 200:
+                    break
+            except Exception:
+                if attempt == 1: raise
+                time.sleep(1)
+                
+        if not response or response.status_code != 200:
             return None
 
         # Add a tiny delay to help avoid immediate rate limits on massive lists

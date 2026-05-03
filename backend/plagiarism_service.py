@@ -206,7 +206,59 @@ def get_submission_code(contest_slug, question_id, username):
 
 _ai_cache = None
 
-def analyze_ai_likelihood(code, language="text", username=None, contest_slug=None):
+def get_title_slug(contest_slug, question_id):
+    """
+    Reads raw_data.json to find the title_slug for a given question_id (e.g. Q3).
+    question_id maps to index 0, 1, 2, 3 in the questions array.
+    """
+    output_dir, _, _, _ = get_paths(contest_slug)
+    raw_path = os.path.join(output_dir, "raw_data.json")
+    try:
+        import json
+        with open(raw_path, "r") as f:
+            data = json.load(f)
+            q_idx = int(question_id.replace("Q", "")) - 1
+            if 0 <= q_idx < len(data.get("questions", [])):
+                return data["questions"][q_idx].get("title_slug")
+    except Exception:
+        pass
+    return None
+
+def fetch_typing_replay(contest_slug, title_slug, username):
+    from curl_cffi import requests
+    import json
+    
+    url = "https://leetcode.com/graphql/"
+    fake_csrf = "fake_csrf_token_1234567890abcdef"
+    headers = {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-csrftoken": fake_csrf,
+        "cookie": f"csrftoken={fake_csrf};"
+    }
+
+    body = {
+        "query": "\n    query UserContestReplayEvents($contestSlug: String!, $questionSlug: String!, $username: String) {\n  userContestReplayEvents(\n    contestSlug: $contestSlug\n    questionSlug: $questionSlug\n    username: $username\n  ) {\n    eventType\n    eventData\n    timestamp\n  }\n}\n    ",
+        "variables": {
+            "contestSlug": contest_slug,
+            "questionSlug": title_slug,
+            "username": username
+        },
+        "operationName": "UserContestReplayEvents"
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=body, impersonate="chrome", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            d = data.get("data")
+            if d:
+                return d.get("userContestReplayEvents") or []
+    except Exception as e:
+        print(f"Error fetching typing replay for {username}: {e}")
+    return []
+
+def analyze_ai_likelihood(code, language="text", username=None, contest_slug=None, title_slug=None):
     """
     Returns a dict with score (0-100) and reasons.
     """
@@ -230,65 +282,141 @@ def analyze_ai_likelihood(code, language="text", username=None, contest_slug=Non
         if cache_key in _ai_cache:
             return _ai_cache[cache_key]
 
+    import re
     score = 0
     reasons = []
+
+    # Try Ollama First
+    def evaluate_with_ollama(code_text):
+        import urllib.request, urllib.error, json
+        prompt = f"""You are an expert AI detection system for competitive programming.
+Analyze the following LeetCode submission and determine if it was written by an AI (like ChatGPT) or a human.
+Respond ONLY with a valid JSON object containing exactly two keys:
+1. "score": an integer from 0 to 100 representing the likelihood it is AI generated.
+2. "reasons": a list of string reasons explaining the score (keep them brief).
+
+Code:
+```
+{code_text}
+```
+"""
+        req = urllib.request.Request("http://localhost:11434/api/generate", data=json.dumps({
+            "model": "qwen2.5-coder:1.5b",
+            "prompt": prompt,
+            "stream": False,
+            "format": "json"
+        }).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=25) as response:
+                result = json.loads(response.read().decode())
+                response_text = result.get("response", "{}")
+                return json.loads(response_text)
+        except Exception:
+            return None
+
+    ollama_result = evaluate_with_ollama(code)
+    if ollama_result and isinstance(ollama_result, dict) and "score" in ollama_result:
+        score = int(ollama_result.get("score", 0))
+        reasons = ollama_result.get("reasons", [])
+        if not isinstance(reasons, list): reasons = [str(reasons)]
+        reasons.insert(0, "[Local LLM Evaluation]")
+    else:
+        # Fallback to static heuristics if Ollama is down/unavailable
     
-    # 1. Comment Analysis (AI explains, humans speed-code)
-    # Removing headers/imports to focus on logic
-    code_lines = code.split('\n')
-    comment_lines = 0
-    total_lines = len(code_lines)
-    
-    comments = []
-    if language in ["cpp", "java", "c"]:
-        comments = [l for l in code_lines if "//" in l or "/*" in l]
-    elif language == "python3":
-        comments = [l for l in code_lines if "#" in l]
+        # 0. Clean Boilerplate
+        clean_code = code
+        clean_code = re.sub(r'/\*\*.*?\*/', '', clean_code, flags=re.DOTALL) # Multi-line comments usually at top
+        clean_code = re.sub(r'// Note: The returned array must be malloced.*', '', clean_code)
         
-    comment_lines = len(comments)
-    
-    if total_lines > 0:
-        ratio = comment_lines / total_lines
-        if ratio > 0.1: # >10% comments is very suspicious for contest
+        code_lines = [line.strip() for line in clean_code.split('\n') if line.strip()]
+        total_lines = len(code_lines)
+        
+        comments = []
+        if language in ["cpp", "java", "c"]:
+            comments = [l for l in code_lines if l.startswith("//") or " //" in l or l.startswith("/*")]
+        elif language == "python3":
+            comments = [l for l in code_lines if l.startswith("#") or " #" in l]
+            
+        # Filter out commented-out code (rough heuristic: if it contains a semicolon or standard operator at the end, it might be code)
+        actual_comments = []
+        for c in comments:
+            # If it's a C++ comment with code like `// cout << x;`
+            if re.search(r'//\s*[a-zA-Z_]\w*\s*(<<|>>|=|;|\()', c): continue
+            if re.search(r'#\s*[a-zA-Z_]\w*\s*(=|\()', c): continue
+            actual_comments.append(c)
+
+        comment_lines = len(actual_comments)
+        
+        # 1. Step-by-Step Comment Detection (The "ChatGPT Signature")
+        step_pattern = re.compile(r'(//|#)\s*(\d+\.|Step\s*\d+:?)', re.IGNORECASE)
+        step_comments = [c for c in actual_comments if step_pattern.search(c)]
+        
+        if len(step_comments) >= 2: # At least 2 steps implies a sequence
+            score += 45
+            reasons.append("Step-by-step algorithmic breakdown in comments")
+            
+        # 2. Adjusted Comment Ratio
+        if total_lines > 0:
+            ratio = comment_lines / total_lines
+            if ratio > 0.15:
+                score += 30
+                reasons.append(f"High comment ratio ({int(ratio*100)}%)")
+            elif ratio > 0.08:
+                score += 15
+                reasons.append("Contains explanatory comments")
+
+        # 3. Suspicious Phrases
+        ai_phrases = [
+            "time complexity", "space complexity", "explanation:",
+            "generated by", "happy coding", "hope this helps",
+            "approach:", "algorithm:", "intuition:", "helper to", "function to"
+        ]
+        
+        found_phrases = [p for p in ai_phrases if p in clean_code.lower()]
+        if found_phrases:
             score += 40
-            reasons.append(f"High comment ratio ({int(ratio*100)}%)")
-        elif ratio > 0.05:
+            reasons.append(f"AI-like phrases found: {', '.join(found_phrases[:2])}")
+
+        # 4. Advanced Variable Naming
+        # Extract variables, ignore short ones and standard keywords
+        tokens = re.findall(r'\b[a-zA-Z_]\w*\b', clean_code)
+        keywords = {"int", "long", "return", "if", "else", "for", "while", "class", "public", "void", "def", "self", "import"}
+        vars = [t for t in tokens if t not in keywords and len(t) > 3]
+        
+        long_vars = [t for t in vars if len(t) >= 14 and re.search(r'[a-z][A-Z]', t)] # CamelCase and long
+        if len(set(long_vars)) >= 2:
             score += 20
-            reasons.append("Contains explanatory comments")
+            reasons.append(f"Verbose CamelCase variables ({', '.join(list(set(long_vars))[:2])})")
 
-    # 2. Suspicious Phrases
-    ai_phrases = [
-        "time complexity", "space complexity", "explanation:",
-        "generated by", "happy coding", "hope this helps",
-        "approach:", "algorithm:", "intuition:"
-    ]
-    
-    found_phrases = [p for p in ai_phrases if p in code.lower()]
-    if found_phrases:
-        score += 50
-        reasons.append(f"AI-like phrases found: {', '.join(found_phrases[:2])}")
+    # 5. Typing Replay Paste Detection
+    if username and contest_slug and title_slug:
+        events = fetch_typing_replay(contest_slug, title_slug, username) or []
+        max_paste_len = 0
+        import json
+        for e in events:
+            if e.get("eventType") in ["7", "10"]:
+                try:
+                    event_data = json.loads(e.get("eventData", "{}"))
+                    changes = event_data.get("change", {}).get("changes", [])
+                    for change in changes:
+                        insert_text = change.get("insert", "")
+                        # Ignore the standard initial boilerplate loads which typically contain the class signature
+                        if "class Solution" not in insert_text and "class " not in insert_text:
+                            max_paste_len = max(max_paste_len, len(insert_text))
+                except Exception:
+                    pass
+        
+        if max_paste_len > 150:
+            score += 50
+            reasons.append(f"Massive code copy-paste detected via replay ({max_paste_len} chars pasted at once)")
 
-    # 3. Code Style (Very dependent on language, keeping simple)
-    # AI tends to use very descriptive variable names like 'current_index' vs 'i'
-    # Simple check for average token length (proxy)
-    import re
-    tokens = re.findall(r'\b[a-zA-Z_]\w*\b', code)
-    # Filter keywords roughly
-    if tokens:
-        avg_len = sum(len(t) for t in tokens) / len(tokens)
-        if avg_len > 7: # Threshold for "descriptive" naming
-            score += 15
-            reasons.append("Verbose variable naming")
-
-    # 4. User Profile Anomaly Detection (Smurf / AI Spiking)
+    # 6. User Profile Anomaly Detection
     if username and contest_slug:
         import rating_fetcher
         
-        # Load User Ranks to get current rank
         ranks = load_user_ranks(contest_slug)
-        user_rank_str = ranks.get(username, "999999")
         try:
-            current_rank = int(user_rank_str)
+            current_rank = int(ranks.get(username, "999999"))
         except ValueError:
             current_rank = 999999
             
@@ -298,14 +426,14 @@ def analyze_ai_likelihood(code, language="text", username=None, contest_slug=Non
                 hist_rating = int(stats.get("rating", "0"))
                 total_solved = int(stats.get("total_solved", 0))
                 
-                # Check for extreme outlier behavior
+                # Reduced weighting slightly
                 if current_rank <= 500 and hist_rating < 1700 and total_solved < 100:
-                    score += 65
-                    reasons.append(f"Profile Anomaly: Top {current_rank} rank but only {total_solved} solved & {hist_rating} rating")
+                    score += 45
+                    reasons.append(f"Profile Anomaly: Top {current_rank} rank but {total_solved} solved & {hist_rating} rating")
                 elif current_rank <= 1000 and hist_rating < 1600 and total_solved < 50:
-                    score += 40
+                    score += 25
                     reasons.append(f"Profile Anomaly: Top {current_rank} rank but lacks experience ({total_solved} solved)")
-            except Exception as e:
+            except Exception:
                 pass
 
     result = {

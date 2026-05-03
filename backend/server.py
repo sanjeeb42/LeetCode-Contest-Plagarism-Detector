@@ -173,7 +173,8 @@ def get_results():
                                 if "def " in code: lang = "python3"
                                 elif "public class" in code: lang = "java"
                                 elif "#include" in code: lang = "cpp"
-                                ai_analysis = plagiarism_detector.analyze_ai_likelihood(code, lang, member, slug)
+                                title_slug = plagiarism_detector.get_title_slug(slug, q_id)
+                                ai_analysis = plagiarism_detector.analyze_ai_likelihood(code, lang, member, slug, title_slug)
                                 member_info["ai_score"] = ai_analysis["score"]
                                 member_info["is_ai_generated"] = ai_analysis["score"] >= 60
                                 member_info["ai_reasons"] = ai_analysis["reasons"]

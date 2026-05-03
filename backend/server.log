@@ -1,0 +1,80 @@
+ * Serving Flask app 'server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5050
+ * Running on http://192.168.1.4:5050
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [02/May/2026 14:55:30] "GET /api/results?contest_slug=weekly-contest-499&threshold=50 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:35] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:35] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:35] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:35] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:36] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:36] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:36] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:38] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:56] "GET /api/contests HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:56] "GET /api/contests HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:03:56] "GET /api/contests HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:12] "GET /api/results?threshold=98&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:12] "GET /api/results?threshold=100&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:12] "GET /api/results?threshold=83&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:12] "GET /api/results?threshold=79&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:12] "GET /api/results?threshold=87&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:12] "GET /api/results?threshold=93&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:14] "GET /api/results?threshold=74&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:14] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:14] "GET /api/results?threshold=76&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:14] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:14] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:14] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:17] "GET /api/results?threshold=72&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:34] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:34] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:34] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:34] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:34] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:34] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:34] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:04:34] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:24:59] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:24:59] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:24:59] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:24:59] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:24:59] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:24:59] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:24:59] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:24:59] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:45] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:45] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "OPTIONS /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:52:55] "POST /api/submission_code HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:53:09] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:53:09] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:53:26] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 15:53:27] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 00:28:14] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 00:28:14] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 13:54:57] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 13:54:58] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 13:58:07] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 13:58:07] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 15:25:21] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 15:25:21] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 18:02:24] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 18:02:25] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 18:12:05] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 18:12:06] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 19:26:50] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
+127.0.0.1 - - [03/May/2026 19:26:50] "GET /api/results?threshold=50&contest_slug=biweekly-contest-181 HTTP/1.1" 200 -
