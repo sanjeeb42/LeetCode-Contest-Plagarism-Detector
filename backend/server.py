@@ -258,19 +258,7 @@ def generate_report():
     if file:
         input_bytes = file.read()
         
-        print("\n--- INCOMING SHEET UPLOAD ---")
-        print(f"Filename: {file.filename}")
-        try:
-            decoded_text = input_bytes.decode('utf-8', errors='replace')
-            lines = decoded_text.splitlines()
-            print(f"Total lines: {len(lines)}")
-            print("First 5 lines:")
-            for i, line in enumerate(lines[:5]):
-                print(f"  {i+1}: {line}")
-        except Exception as e:
-            print("Could not print preview:", e)
-        print("-----------------------------\n")
-        
+
         # Process entirely in memory (Don't save anywhere)
         try:
             output_bytes = rating_fetcher.process_csv_in_memory(input_bytes)
