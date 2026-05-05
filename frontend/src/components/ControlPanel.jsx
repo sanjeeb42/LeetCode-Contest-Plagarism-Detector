@@ -156,7 +156,7 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
                 color="blue"
                 status={taskStatus.fetch.status}
                 progress={taskStatus.fetch.progress}
-                onClick={() => triggerTask('fetch', 'fetch', { limit: pageLimit })}
+                onClick={() => triggerTask('fetch', 'fetch', { limit: pageLimit || 10 })}
                 extraAction={
                     <div className="flex flex-col w-24">
                         <label className="text-[10px] text-slate-500 font-mono mb-1">PAGES (1≈25U)</label>
@@ -165,7 +165,7 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
                             min="1"
                             max="500"
                             value={pageLimit}
-                            onChange={(e) => setPageLimit(parseInt(e.target.value) || 1)}
+                            onChange={(e) => setPageLimit(e.target.value === '' ? '' : parseInt(e.target.value))}
                             className="bg-slate-900 border border-slate-700 rounded text-white text-sm px-2 py-1 outline-none focus:border-blue-500"
                         />
                     </div>
