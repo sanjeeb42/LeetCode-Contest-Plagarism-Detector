@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Loader2, Play, Download, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Play, Download, CheckCircle, AlertCircle, Scan } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
@@ -16,6 +16,12 @@ const variants = {
         iconBox: "bg-violet-500/10 text-violet-400 group-hover:bg-violet-500/20 group-hover:text-violet-300",
         loader: "bg-violet-500",
         success: "text-violet-400"
+    },
+    amber: {
+        overlay: "bg-gradient-to-br from-amber-500 to-transparent",
+        iconBox: "bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 group-hover:text-amber-300",
+        loader: "bg-amber-500",
+        success: "text-amber-400"
     }
 };
 
@@ -99,9 +105,11 @@ const ActionCard = ({ title, description, icon: Icon, onClick, status, progress,
 const ControlPanel = ({ onRefresh, contestSlug }) => {
     const [taskStatus, setTaskStatus] = useState({
         fetch: { status: 'idle', progress: 0 },
-        analyze: { status: 'idle', progress: 0 }
+        analyze: { status: 'idle', progress: 0 },
+        top500_scan: { status: 'idle', progress: 0 }
     });
     const [pageLimit, setPageLimit] = useState(10);
+    const [scanLimit, setScanLimit] = useState(500);
 
     const pollStatus = async (taskName) => {
         const interval = setInterval(async () => {
@@ -148,7 +156,7 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
     };
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             <ActionCard
                 title="Fetch Submissions"
                 description="Connect to LeetCode API to retrieve latest contest data and source code."
@@ -180,6 +188,29 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
                 status={taskStatus.analyze.status}
                 progress={taskStatus.analyze.progress}
                 onClick={() => triggerTask('analyze', 'analyze')}
+            />
+
+            <ActionCard
+                title="Scan Top 500 for AI"
+                description="Analyze typing replays of top ranked users for AI-pasted code."
+                icon={Scan}
+                color="amber"
+                status={taskStatus.top500_scan.status}
+                progress={taskStatus.top500_scan.progress}
+                onClick={() => triggerTask('top500_scan', 'top500_scan', { limit: scanLimit || 500 })}
+                extraAction={
+                    <div className="flex flex-col w-24">
+                        <label className="text-[10px] text-slate-500 font-mono mb-1">USERS</label>
+                        <input
+                            type="number"
+                            min="1"
+                            max="500"
+                            value={scanLimit}
+                            onChange={(e) => setScanLimit(e.target.value === '' ? '' : parseInt(e.target.value))}
+                            className="bg-slate-900 border border-slate-700 rounded text-white text-sm px-2 py-1 outline-none focus:border-amber-500"
+                        />
+                    </div>
+                }
             />
         </div>
     );

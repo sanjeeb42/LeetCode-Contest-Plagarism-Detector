@@ -262,12 +262,32 @@ def fetch_typing_replay(contest_slug, title_slug, username):
         print(f"Error fetching typing replay for {username} (slug: {user_slug}): {e}")
     return []
 
+def get_question_id(contest_slug, title_slug):
+    """Returns the numeric question_id for a given title_slug."""
+    output_dir, _, _, _ = get_paths(contest_slug)
+    raw_path = os.path.join(output_dir, "raw_data.json")
+    try:
+        import json
+        with open(raw_path, "r") as f:
+            data = json.load(f)
+            for q in data.get("questions", []):
+                if q.get("title_slug") == title_slug:
+                    return str(q.get("question_id"))
+    except Exception:
+        pass
+    return None
+
 def get_typing_replay_frames(contest_slug, title_slug, username):
     events = fetch_typing_replay(contest_slug, title_slug, username)
     frames = []
     code_state = ""
     
+    # Get the numeric questionId to filter events for this specific question
+    target_qid = get_question_id(contest_slug, title_slug)
     import json
+    
+    # Pre-parse all events
+    parsed_events = []
     for event in events:
         event_type = str(event.get("eventType"))
         event_data_str = event.get("eventData")
@@ -275,10 +295,25 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
         
         if not event_data_str:
             continue
-            
         try:
             event_data = json.loads(event_data_str)
         except:
+            continue
+        parsed_events.append((event_type, event_data, timestamp))
+    
+    for i, (event_type, event_data, timestamp) in enumerate(parsed_events):
+        event_qid = str(event_data.get("questionId", ""))
+        
+        # Filter by questionId
+        if target_qid and event_qid and event_qid != target_qid:
+            # Exception: switch_language events (types 0, 2) have the SOURCE question's ID.
+            # Include them if the NEXT event belongs to our target question.
+            if event_type in ("0", "2"):
+                if i + 1 < len(parsed_events):
+                    next_qid = str(parsed_events[i + 1][1].get("questionId", ""))
+                    if next_qid == target_qid:
+                        lang = event_data.get("lang", "unknown")
+                        frames.append({"timestamp": timestamp, "code": code_state, "event": "switch_language", "lang": lang})
             continue
             
         if event_type == "7":
@@ -298,16 +333,22 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
             
         elif event_type == "10":
             if "c" in event_data:
-                changes = event_data.get("c", [])
-                for change in changes:
-                    if "l" in change and "t" in change:
-                        pos = change["l"]
-                        text = change["t"]
-                        code_state = code_state[:pos] + text + code_state[pos:]
-                    elif "l" in change and "d" in change:
-                        pos = change["l"]
-                        del_len = change["d"]
-                        code_state = code_state[:pos] + code_state[pos + del_len:]
+                old_changes = event_data["c"]
+                if isinstance(old_changes, str):
+                    code_state = old_changes
+                elif isinstance(old_changes, list):
+                    for change in old_changes:
+                        if "t" in change:
+                            insert_text = change["t"]
+                            pos = change.get("l", len(code_state))
+                            code_state = code_state[:pos] + insert_text + code_state[pos:]
+                            
+                            if len(insert_text) > 50:
+                                frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text)})
+                        elif "l" in change and "d" in change:
+                            pos = change["l"]
+                            del_len = change["d"]
+                            code_state = code_state[:pos] + code_state[pos + del_len:]
             else:
                 changes = event_data.get("change", {}).get("changes", [])
                 for change in changes:
@@ -358,6 +399,305 @@ def set_manual_override(contest_slug, username, is_ai):
         try:
             with open(cache_path, "w") as f: json.dump(_ai_cache, f)
         except: pass
+
+# --- TOP 500 AI SUSPECT SCANNER ---
+
+def get_top_n_users(contest_slug, n=500):
+    """Reads the already-fetched raw_data.json and returns the top N users sorted by rank."""
+    import json
+    output_dir, _, _, _ = get_paths(contest_slug)
+    raw_json_file = os.path.join(output_dir, "raw_data.json")
+    
+    if not os.path.exists(raw_json_file):
+        return []
+    
+    try:
+        with open(raw_json_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return []
+    
+    total_rank = data.get("total_rank", [])
+    
+    # Filter out CN region users and sort by rank
+    users = []
+    submissions_list = data.get("submissions", [])
+    for i, rank_entry in enumerate(total_rank):
+        # Check CN region
+        is_cn = False
+        if i < len(submissions_list):
+            for q_val in submissions_list[i].values():
+                if isinstance(q_val, dict) and q_val.get("data_region") == "CN":
+                    is_cn = True
+                    break
+        if is_cn:
+            continue
+            
+        users.append({
+            "username": rank_entry.get("username"),
+            "user_slug": rank_entry.get("user_slug") or rank_entry.get("username"),
+            "rank": rank_entry.get("rank", 99999)
+        })
+    
+    # Sort by rank and return top N
+    users.sort(key=lambda u: u["rank"])
+    return users[:n]
+
+def analyze_replay_for_ai(contest_slug, username, title_slug):
+    """Analyzes a single user's typing replay for AI indicators in their pasted code."""
+    import json
+    
+    events = fetch_typing_replay(contest_slug, title_slug, username) or []
+    
+    if not events:
+        return {"ai_score": 0, "reasons": [], "paste_events": [], "paste_ratio": 0, "final_code": ""}
+    
+    # Process events to extract paste content
+    paste_events = []
+    code_state = ""
+    total_typed_chars = 0
+    total_pasted_chars = 0
+    
+    for event in events:
+        event_type = str(event.get("eventType"))
+        event_data_str = event.get("eventData")
+        timestamp = event.get("timestamp", 0)
+        
+        if not event_data_str:
+            continue
+        try:
+            event_data = json.loads(event_data_str)
+        except:
+            continue
+        
+        if event_type in ("7", "10"):
+            if event_type == "7" and "c" in event_data:
+                code_state = event_data.get("c", "")
+            else:
+                changes = event_data.get("change", {}).get("changes", [])
+                for change in changes:
+                    from_pos = change.get("from", 0)
+                    to_pos = change.get("to", from_pos)
+                    insert_text = change.get("insert", "")
+                    code_state = code_state[:from_pos] + insert_text + code_state[to_pos:]
+                    
+                    is_from_inside = event_data.get("isFromInside", False)
+                    
+                    if len(insert_text) > 50 and not is_from_inside:
+                        total_pasted_chars += len(insert_text)
+                        
+                        # Analyze the pasted text for AI markers
+                        has_comments = _check_paste_for_comments(insert_text)
+                        has_ai_phrases = _check_paste_for_ai_phrases(insert_text)
+                        
+                        paste_events.append({
+                            "timestamp": timestamp,
+                            "chars": len(insert_text),
+                            "has_comments": has_comments,
+                            "has_ai_phrases": has_ai_phrases,
+                            "preview": insert_text[:150]
+                        })
+                    else:
+                        total_typed_chars += len(insert_text)
+                
+                # Handle old format
+                if event_type == "10" and "c" in event_data and isinstance(event_data["c"], list):
+                    for change in event_data["c"]:
+                        if "t" in change:
+                            insert_text = change["t"]
+                            if len(insert_text) > 50:
+                                total_pasted_chars += len(insert_text)
+                                paste_events.append({
+                                    "timestamp": timestamp,
+                                    "chars": len(insert_text),
+                                    "has_comments": _check_paste_for_comments(insert_text),
+                                    "has_ai_phrases": _check_paste_for_ai_phrases(insert_text),
+                                    "preview": insert_text[:150]
+                                })
+    
+    final_code = code_state
+    final_code_len = len(final_code) if final_code else 1
+    paste_ratio = total_pasted_chars / final_code_len if final_code_len > 0 else 0
+    
+    # Score computation
+    score = 0
+    reasons = []
+    
+    # 1. Any paste with comments = strong AI indicator
+    pastes_with_comments = [p for p in paste_events if p["has_comments"]]
+    if pastes_with_comments:
+        score += 40
+        reasons.append(f"Comments detected in {len(pastes_with_comments)} pasted block(s)")
+    
+    # 2. AI phrases in pasted text
+    pastes_with_ai_phrases = [p for p in paste_events if p["has_ai_phrases"]]
+    if pastes_with_ai_phrases:
+        score += 30
+        reasons.append(f"AI-like phrases found in pasted code")
+    
+    # 3. High paste ratio
+    if paste_ratio > 0.8:
+        score += 25
+        reasons.append(f"Paste ratio: {int(paste_ratio * 100)}% of code was pasted")
+    elif paste_ratio > 0.5:
+        score += 15
+        reasons.append(f"Paste ratio: {int(paste_ratio * 100)}% of code was pasted")
+    
+    # 4. Very large single paste (> 300 chars)
+    max_paste = max((p["chars"] for p in paste_events), default=0)
+    if max_paste > 300:
+        score += 20
+        reasons.append(f"Large single paste of {max_paste} characters")
+    
+    # 5. Extremely fast completion (entire code pasted in < 30 seconds of editing)
+    if len(events) > 0 and len(events) < 10 and paste_ratio > 0.9:
+        score += 15
+        reasons.append("Extremely few keystrokes — code appears fully pasted")
+    
+    return {
+        "ai_score": min(score, 100),
+        "reasons": reasons,
+        "paste_events": paste_events,
+        "paste_ratio": round(paste_ratio, 2),
+        "final_code": final_code
+    }
+
+def _check_paste_for_comments(text):
+    """Check if pasted text contains explanatory comments (AI signature)."""
+    lines = text.split("\n")
+    comment_count = 0
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("//") or stripped.startswith("#"):
+            # Exclude simple commented-out code
+            if not re.search(r'(//|#)\s*[a-zA-Z_]\w*\s*(<<|>>|=|;|\()', stripped):
+                comment_count += 1
+    
+    # Step-by-step pattern
+    step_pattern = re.compile(r'(//|#)\s*(\d+\.|Step\s*\d+:?)', re.IGNORECASE)
+    has_steps = any(step_pattern.search(line) for line in lines)
+    
+    return comment_count >= 2 or has_steps
+
+def _check_paste_for_ai_phrases(text):
+    """Check if pasted text contains phrases commonly found in AI-generated code."""
+    ai_phrases = [
+        "time complexity", "space complexity", "explanation:",
+        "approach:", "algorithm:", "intuition:", "helper to",
+        "function to", "base case", "edge case", "step 1",
+        "step 2", "step 3", "// note:", "# note:"
+    ]
+    text_lower = text.lower()
+    return any(phrase in text_lower for phrase in ai_phrases)
+
+def run_top500_scan(contest_slug, n=500, progress_callback=None):
+    """Orchestrates scanning the top N users' replays for AI indicators."""
+    import json, time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    output_dir, _, _, _ = get_paths(contest_slug)
+    results_path = os.path.join(output_dir, "top500_ai_results.json")
+    
+    # Get top N users
+    users = get_top_n_users(contest_slug, n=n)
+    if not users:
+        return {"error": "No users found. Run 'Fetch Submissions' first."}
+    
+    # Get question slugs for Q3 and Q4
+    questions = {}
+    for q_id in ["Q3", "Q4"]:
+        slug = get_title_slug(contest_slug, q_id)
+        if slug:
+            questions[q_id] = slug
+    
+    if not questions:
+        return {"error": "Could not determine question slugs. Ensure contest data is fetched."}
+    
+    total_tasks = len(users) * len(questions)
+    completed = 0
+    results = []
+    
+    print(f"[*] Starting Top 500 AI scan: {len(users)} users × {len(questions)} questions = {total_tasks} replay checks")
+    
+    for user in users:
+        username = user["username"]
+        user_result = {
+            "username": username,
+            "user_slug": user["user_slug"],
+            "rank": user["rank"],
+            "questions": {},
+            "total_ai_score": 0,
+            "total_reasons": []
+        }
+        
+        max_score = 0
+        all_reasons = []
+        
+        for q_id, title_slug in questions.items():
+            try:
+                analysis = analyze_replay_for_ai(contest_slug, username, title_slug)
+                user_result["questions"][q_id] = {
+                    "ai_score": analysis["ai_score"],
+                    "reasons": analysis["reasons"],
+                    "paste_events": analysis["paste_events"],
+                    "paste_ratio": analysis["paste_ratio"],
+                    "final_code": analysis["final_code"]
+                }
+                
+                if analysis["ai_score"] > max_score:
+                    max_score = analysis["ai_score"]
+                all_reasons.extend(analysis["reasons"])
+                
+            except Exception as e:
+                print(f"[!] Error scanning {username} for {q_id}: {e}")
+                user_result["questions"][q_id] = {
+                    "ai_score": 0, "reasons": ["Scan error"], 
+                    "paste_events": [], "paste_ratio": 0, "final_code": ""
+                }
+            
+            completed += 1
+            if progress_callback:
+                progress_callback(int((completed / total_tasks) * 100))
+            
+            # Rate limiting — gentle delay between API calls
+            time.sleep(0.3)
+        
+        user_result["total_ai_score"] = max_score
+        user_result["total_reasons"] = list(set(all_reasons))
+        results.append(user_result)
+    
+    # Sort by AI score descending
+    results.sort(key=lambda r: r["total_ai_score"], reverse=True)
+    
+    # Save results
+    output = {
+        "contest_slug": contest_slug,
+        "total_scanned": len(users),
+        "total_flagged": len([r for r in results if r["total_ai_score"] >= 60]),
+        "questions_scanned": list(questions.keys()),
+        "suspects": results
+    }
+    
+    with open(results_path, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2)
+    
+    print(f"[✓] Top 500 scan complete. {output['total_flagged']} suspects flagged.")
+    return output
+
+def load_top500_results(contest_slug):
+    """Load previously saved top 500 scan results."""
+    import json
+    output_dir, _, _, _ = get_paths(contest_slug)
+    results_path = os.path.join(output_dir, "top500_ai_results.json")
+    
+    if not os.path.exists(results_path):
+        return None
+    
+    try:
+        with open(results_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 def analyze_ai_likelihood(code, language="text", username=None, contest_slug=None, title_slug=None):
     """

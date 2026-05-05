@@ -43,8 +43,11 @@ def init_task_status(slug):
     if slug not in task_status:
         task_status[slug] = {
             "fetch": {"status": "idle", "message": "", "progress": 0},
-            "analyze": {"status": "idle", "message": "", "progress": 0}
+            "analyze": {"status": "idle", "message": "", "progress": 0},
+            "top500_scan": {"status": "idle", "message": "", "progress": 0}
         }
+    elif "top500_scan" not in task_status[slug]:
+        task_status[slug]["top500_scan"] = {"status": "idle", "message": "", "progress": 0}
 
 def run_fetch_task(slug, limit=10):
     global task_status
@@ -71,6 +74,24 @@ def run_analyze_task(slug):
             task_status[slug]["analyze"] = {"status": "error", "message": "Analysis failed."}
     except Exception as e:
         task_status[slug]["analyze"] = {"status": "error", "message": str(e)}
+
+def run_top500_scan_task(slug, limit=500):
+    global task_status
+    try:
+        def update_progress(p):
+            task_status[slug]["top500_scan"]["progress"] = p
+
+        result = plagiarism_detector.run_top500_scan(slug, n=limit, progress_callback=update_progress)
+        if "error" in result:
+            task_status[slug]["top500_scan"] = {"status": "error", "message": result["error"]}
+        else:
+            task_status[slug]["top500_scan"] = {
+                "status": "success",
+                "message": f"Scan complete. {result.get('total_flagged', 0)} suspects flagged.",
+                "progress": 100
+            }
+    except Exception as e:
+        task_status[slug]["top500_scan"] = {"status": "error", "message": str(e)}
 
 @app.route('/api/contests', methods=['GET'])
 def get_contests_route():
@@ -258,6 +279,37 @@ def typing_replay():
         
     frames = plagiarism_detector.get_typing_replay_frames(slug, title_slug, username)
     return jsonify({"frames": frames})
+
+@app.route('/api/top500_scan', methods=['POST'])
+def trigger_top500_scan():
+    data = request.json
+    slug = data.get("contest_slug")
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+
+    init_task_status(slug)
+
+    if task_status[slug]["top500_scan"]["status"] == "running":
+        return jsonify({"error": "Top 500 scan already in progress"}), 409
+
+    task_status[slug]["top500_scan"] = {"status": "running", "message": "Starting scan...", "progress": 0}
+
+    limit = int(data.get("limit", 500))
+    thread = threading.Thread(target=run_top500_scan_task, args=(slug, limit))
+    thread.start()
+    return jsonify({"message": f"Top 500 AI scan started for {slug}"}), 202
+
+@app.route('/api/top500_results', methods=['GET'])
+def get_top500_results():
+    slug = request.args.get('contest_slug')
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+
+    results = plagiarism_detector.load_top500_results(slug)
+    if results:
+        return jsonify(results)
+    else:
+        return jsonify({"error": "No scan results found. Run the Top 500 scan first."}), 404
 
 @app.route('/api/reference', methods=['GET', 'POST'])
 def manage_references():
