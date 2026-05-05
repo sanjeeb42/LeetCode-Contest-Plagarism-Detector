@@ -287,7 +287,9 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
             else:
                 changes = event_data.get("change", {}).get("changes", [])
                 for change in changes:
-                    code_state = code_state[:change.get("from", 0)] + change.get("insert", "") + code_state[change.get("to", 0):]
+                    from_pos = change.get("from", 0)
+                    to_pos = change.get("to", from_pos)
+                    code_state = code_state[:from_pos] + change.get("insert", "") + code_state[to_pos:]
             frames.append({"timestamp": timestamp, "code": code_state, "event": "flush"})
             
         elif event_type == "10":
@@ -306,7 +308,7 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
                 changes = event_data.get("change", {}).get("changes", [])
                 for change in changes:
                     from_pos = change.get("from", 0)
-                    to_pos = change.get("to", 0)
+                    to_pos = change.get("to", from_pos)
                     insert_text = change.get("insert", "")
                     code_state = code_state[:from_pos] + insert_text + code_state[to_pos:]
             

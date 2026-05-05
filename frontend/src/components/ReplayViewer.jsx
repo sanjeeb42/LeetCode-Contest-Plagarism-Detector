@@ -7,8 +7,9 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
     const [frames, setFrames] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [currentIndex, setCurrentIndex] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0); // Relative time in ms
     const [isPlaying, setIsPlaying] = useState(false);
+    const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
     useEffect(() => {
         const fetchReplay = async () => {
@@ -20,7 +21,15 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                 });
                 
                 if (resp.data.frames && resp.data.frames.length > 0) {
-                    setFrames(resp.data.frames);
+                    // Convert ISO 8601 timestamp strings to millisecond numbers
+                    const parsedFrames = resp.data.frames.map(f => ({
+                        ...f,
+                        timestamp: new Date(f.timestamp).getTime() || 0
+                    }));
+                    // Sort frames by timestamp just in case
+                    parsedFrames.sort((a, b) => a.timestamp - b.timestamp);
+                    setFrames(parsedFrames);
+                    setCurrentTime(0);
                 } else {
                     setError("No replay events found for this user/question.");
                 }
@@ -34,26 +43,58 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
         fetchReplay();
     }, [contestSlug, questionId, username]);
 
-    // Auto-play logic
+    const startTime = frames.length > 0 ? frames[0].timestamp : 0;
+    const endTime = frames.length > 0 ? frames[frames.length - 1].timestamp : 0;
+    const duration = endTime > startTime ? endTime - startTime : 0;
+
+    // Determine the active frame based on the current time
+    const activeIndex = React.useMemo(() => {
+        if (frames.length === 0) return 0;
+        let low = 0;
+        let high = frames.length - 1;
+        let best = 0;
+        
+        while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            if (frames[mid].timestamp - startTime <= currentTime) {
+                best = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return best;
+    }, [frames, currentTime, startTime]);
+
+    // Auto-play logic based on time
     useEffect(() => {
         let interval;
         if (isPlaying && frames.length > 0) {
+            const TICK_MS = 50; // 50ms tick rate
             interval = setInterval(() => {
-                setCurrentIndex(prev => {
-                    if (prev >= frames.length - 1) {
+                setCurrentTime(prev => {
+                    const nextTime = prev + (TICK_MS * playbackSpeed * 10); // Playback speed multiplier (default 10x for contest replays to not take hours)
+                    if (nextTime >= duration) {
                         setIsPlaying(false);
-                        return prev;
+                        return duration;
                     }
-                    return prev + 1;
+                    return nextTime;
                 });
-            }, 100); // 100ms per frame
+            }, TICK_MS);
         }
         return () => clearInterval(interval);
-    }, [isPlaying, frames]);
+    }, [isPlaying, frames, playbackSpeed, duration]);
 
     const handleSliderChange = (e) => {
-        setCurrentIndex(parseInt(e.target.value));
+        setCurrentTime(parseInt(e.target.value));
         setIsPlaying(false);
+    };
+
+    const formatTime = (ms) => {
+        const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
+        const m = Math.floor(totalSeconds / 60);
+        const s = totalSeconds % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
     return (
@@ -86,7 +127,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                         <>
                             <div className="flex-1 overflow-auto bg-slate-900 border border-white/5 rounded-xl p-4 custom-scrollbar mb-6 relative group">
                                 <pre className="font-mono text-sm text-slate-300 w-full whitespace-pre-wrap break-all">
-                                    <code>{frames[currentIndex]?.code}</code>
+                                    <code>{frames[activeIndex]?.code}</code>
                                 </pre>
                             </div>
 
@@ -94,7 +135,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                             <div className="bg-slate-800/80 backdrop-blur border border-white/10 rounded-xl p-4">
                                 <div className="flex items-center gap-4 mb-4">
                                     <button 
-                                        onClick={() => { setCurrentIndex(0); setIsPlaying(false); }}
+                                        onClick={() => { setCurrentTime(0); setIsPlaying(false); }}
                                         className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-lg"
                                         title="Rewind to start"
                                     >
@@ -112,32 +153,48 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                                     </button>
 
                                     <button 
-                                        onClick={() => { setCurrentIndex(frames.length - 1); setIsPlaying(false); }}
+                                        onClick={() => { setCurrentTime(duration); setIsPlaying(false); }}
                                         className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-lg"
                                         title="Skip to end"
                                     >
                                         <SkipForward className="w-4 h-4" />
                                     </button>
 
+                                    <div className="flex items-center gap-2 ml-4">
+                                        <span className="text-xs text-slate-500">Speed:</span>
+                                        <select 
+                                            value={playbackSpeed} 
+                                            onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+                                            className="bg-slate-900 border border-white/10 text-white text-xs rounded px-2 py-1 outline-none"
+                                        >
+                                            <option value={1}>1x</option>
+                                            <option value={2}>2x</option>
+                                            <option value={5}>5x</option>
+                                            <option value={10}>10x</option>
+                                            <option value={20}>20x</option>
+                                            <option value={50}>50x</option>
+                                        </select>
+                                    </div>
+
                                     <div className="ml-auto text-sm text-slate-400 font-mono">
-                                        Frame: <span className="text-white">{currentIndex + 1}</span> / {frames.length}
+                                        Time: <span className="text-white">{formatTime(currentTime)}</span> / {formatTime(duration)}
                                     </div>
                                 </div>
 
                                 {/* Timeline Slider */}
                                 <div className="flex items-center gap-4">
-                                    <span className="text-xs text-slate-500 font-mono">0</span>
+                                    <span className="text-xs text-slate-500 font-mono">{formatTime(0)}</span>
                                     <input 
                                         type="range" 
                                         min="0" 
-                                        max={frames.length - 1} 
-                                        value={currentIndex}
+                                        max={duration} 
+                                        value={currentTime}
                                         onChange={handleSliderChange}
                                         className="flex-1 h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-500"
                                     />
-                                    <span className="text-xs text-slate-500 font-mono">{frames.length}</span>
+                                    <span className="text-xs text-slate-500 font-mono">{formatTime(duration)}</span>
                                 </div>
-                                <p className="text-center text-[10px] text-slate-500 mt-2 italic">Drag slider to scrub back and forth instantly to spot massive copy-paste jumps.</p>
+                                <p className="text-center text-[10px] text-slate-500 mt-2 italic">Drag slider to scrub through the exact timing of the user's keystrokes.</p>
                             </div>
                         </>
                     )}
