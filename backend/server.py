@@ -199,6 +199,22 @@ def get_results():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/override_ai', methods=['POST'])
+def override_ai():
+    data = request.json
+    contest_slug = data.get('contest_slug')
+    username = data.get('username')
+    is_ai = data.get('is_ai')
+
+    if not all([contest_slug, username]) or is_ai is None:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        plagiarism_detector.set_manual_override(contest_slug, username, is_ai)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/submission_code', methods=['POST'])
 def get_submission_code():
     data = request.json
@@ -225,6 +241,23 @@ def get_submission_code():
         })
     else:
         return jsonify({"error": "Code not found"}), 404
+
+@app.route('/api/typing_replay', methods=['POST'])
+def typing_replay():
+    data = request.json
+    slug = data.get("contest_slug")
+    question_id = data.get("question_id")
+    username = data.get("username")
+    
+    if not all([slug, question_id, username]):
+        return jsonify({"error": "Missing required fields"}), 400
+        
+    title_slug = plagiarism_detector.get_title_slug(slug, question_id)
+    if not title_slug:
+        return jsonify({"error": "Could not determine title slug"}), 404
+        
+    frames = plagiarism_detector.get_typing_replay_frames(slug, title_slug, username)
+    return jsonify({"frames": frames})
 
 @app.route('/api/reference', methods=['GET', 'POST'])
 def manage_references():

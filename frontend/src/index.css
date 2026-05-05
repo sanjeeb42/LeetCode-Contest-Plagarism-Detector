@@ -14,30 +14,95 @@
 body {
   margin: 0;
   min-height: 100vh;
-  /* Deep Space Background */
-  background: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 100%);
+  /* Very dark warm gradient base instead of pure black */
+  background: radial-gradient(circle at 50% 0%, #1a1610 0%, #050403 100%);
   color: #f8fafc;
   font-family: var(--font-sans);
   overflow-x: hidden;
+  position: relative;
 }
 
-/* Subtle Grid Pattern */
+/* Base Noise Texture for Premium Feel */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Dynamic Mesh Gradients - Much larger and more vivid */
+.glow-cyan {
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  /* LeetCode Bright Yellow/Orange */
+  background: radial-gradient(ellipse at 30% 20%, rgba(255, 161, 22, 0.25) 0%, rgba(245, 158, 11, 0.08) 40%, transparent 70%);
+  filter: blur(120px);
+  z-index: -2;
+  pointer-events: none;
+  top: -10%;
+  left: -10%;
+  animation: float-slow 20s infinite alternate ease-in-out;
+}
+
+.glow-blue {
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  /* Warm Amber/Red tint to complement the yellow */
+  background: radial-gradient(ellipse at 70% 80%, rgba(239, 68, 68, 0.15) 0%, rgba(217, 119, 6, 0.08) 40%, transparent 70%);
+  filter: blur(140px);
+  z-index: -2;
+  pointer-events: none;
+  bottom: -10%;
+  right: -10%;
+  animation: float-slow-reverse 25s infinite alternate ease-in-out;
+}
+
+/* Elegant Grid Pattern with Radial Fade - Tinted Warm */
 .bg-grid {
   background-size: 50px 50px;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  mask-image: linear-gradient(to bottom, black 40%, transparent 90%);
+  background-image: linear-gradient(to right, rgba(255, 161, 22, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 161, 22, 0.05) 1px, transparent 1px);
+  mask-image: radial-gradient(circle at center 30%, black 15%, transparent 85%);
+  -webkit-mask-image: radial-gradient(circle at center 30%, black 15%, transparent 85%);
+  position: fixed;
+  inset: 0;
+  z-index: -3;
 }
 
 /* Glassmorphism Utilities */
 .glass-panel {
-  @apply bg-slate-900/40 backdrop-blur-xl border border-white/10 shadow-2xl;
+  @apply bg-[#0f0e0d]/40 backdrop-blur-[40px] border border-amber-500/10 shadow-[0_8px_32px_rgba(0,0,0,0.6)] rounded-2xl;
+  box-shadow: inset 0 0 0 1px rgba(255, 161, 22, 0.05), 0 20px 40px -10px rgba(0,0,0,0.8);
 }
 
 .glass-card {
-  @apply bg-slate-800/30 backdrop-blur-md border border-white/5 hover:border-white/10 transition-all duration-300;
+  @apply bg-[#141210]/40 backdrop-blur-[24px] border border-amber-500/10 hover:bg-[#1f1a16]/50 hover:border-amber-500/30 transition-all duration-500 rounded-2xl;
+  box-shadow: inset 0 0 0 1px rgba(255, 161, 22, 0.02);
+}
+
+/* Premium Buttons - Bringing in the signature Yellow */
+.btn-primary {
+  @apply px-6 py-3 bg-[#FFA116] text-[#1a1100] font-bold rounded-lg hover:bg-[#ffb03a] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 inline-flex items-center justify-center gap-2 text-sm shadow-[0_0_30px_rgba(255,161,22,0.3)];
+}
+
+.btn-secondary {
+  @apply px-5 py-2.5 bg-transparent border border-amber-500/30 text-amber-500 font-medium rounded-lg hover:bg-amber-500/10 hover:text-amber-400 transition-all duration-200 inline-flex items-center justify-center gap-2 text-sm shadow-[0_0_20px_rgba(255,161,22,0.05)];
 }
 
 .text-glow {
-  text-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+  text-shadow: 0 0 30px rgba(255, 161, 22, 0.6);
+}
+
+@keyframes float-slow {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(80px, 50px) scale(1.1); }
+}
+
+@keyframes float-slow-reverse {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-60px, -70px) scale(1.05); }
 }

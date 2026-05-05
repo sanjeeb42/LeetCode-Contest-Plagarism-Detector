@@ -38,24 +38,21 @@ function ContestDashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-transparent relative z-10">
+        <div className="min-h-screen bg-transparent relative z-10 overflow-hidden">
             <div className="fixed inset-0 bg-grid z-[-1] pointer-events-none" />
+            <div className="glow-cyan top-[-100px] left-[-100px]" />
+            <div className="glow-blue bottom-[-100px] right-[-100px]" />
 
-            <header className="sticky top-0 z-50 glass-panel border-b-0 border-b-white/5">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <header className="sticky top-0 z-50 glass-panel rounded-none border-t-0 border-x-0 border-b-white/10 shadow-none">
+                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link to="/" className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
+                        <Link to="/" className="p-2 hover:bg-white/10 rounded-md transition-colors text-gray-400 hover:text-white">
                             <ArrowLeft className="w-5 h-5" />
                         </Link>
                         <div className="flex items-center gap-3">
-                            <div className="bg-sky-500/20 p-2 rounded-xl border border-sky-500/30">
-                                <ShieldAlert className="w-6 h-6 text-sky-400" />
-                            </div>
+                            <ShieldAlert className="w-6 h-6 text-white" />
                             <div>
-                                <h1 className="text-xl font-bold text-white tracking-tight">LeetCode<span className="text-sky-400">Detective</span></h1>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] font-bold text-slate-500 tracking-wider">MADE BY SANJEEB</span>
-                                </div>
+                                <h1 className="text-lg font-semibold text-white tracking-tight">LeetCode <span className="text-gray-400 font-normal">Detective</span></h1>
                             </div>
                         </div>
                     </div>
@@ -64,60 +61,64 @@ function ContestDashboard() {
                         {/* Reference Manager Button */}
                         <button
                             onClick={() => setShowReferenceManager(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg border border-indigo-500/20 hover:bg-indigo-500/20 transition-all font-medium text-sm"
+                            className="btn-secondary py-1.5"
                         >
                             <Bot className="w-4 h-4" />
                             <span>AI References</span>
                         </button>
 
-                        <div className="hidden md:flex flex-col items-end">
-                            <span className="text-xs text-slate-500 font-mono">CONFIDENCE</span>
-                            <span className="text-2xl font-bold font-mono text-sky-400">{threshold}%</span>
-                        </div>
-                        <div className="w-48">
-                            <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={threshold}
-                                onChange={(e) => setThreshold(e.target.value)}
-                                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500 hover:accent-sky-400 transition-colors"
-                            />
+                        <div className="hidden md:flex items-center gap-4">
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">Confidence</span>
+                                <span className="text-lg font-bold font-mono text-white">{threshold}%</span>
+                            </div>
+                            <div className="w-48 flex items-center">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={threshold}
+                                    onChange={(e) => setThreshold(e.target.value)}
+                                    className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-200 transition-colors"
+                                />
+                            </div>
                         </div>
                         <button
                             onClick={handleExport}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-white/5 flex items-center gap-2"
+                            className="btn-primary py-1.5"
                         >
-                            <Download className="w-4 h-4" />
+                            <Download className="w-4 h-4 text-black" />
                             Export
                         </button>
                     </div>
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-6 py-12">
+            <main className="max-w-7xl mx-auto px-6 py-12 relative z-10">
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="mb-12"
+                    transition={{ duration: 0.4 }}
+                    className="mb-10"
                 >
-                    <div className="flex items-center gap-2 mb-2 text-sky-500 font-medium text-sm">
+                    <div className="flex items-center gap-2 mb-3 text-cyan-400 font-medium text-xs tracking-widest uppercase">
                         <Cpu className="w-4 h-4" />
-                        <span className="tracking-wider uppercase text-xs font-bold">Target Locked</span>
+                        <span>Target Locked</span>
                     </div>
-                    <h2 className="text-4xl font-bold text-white mb-4 tracking-tight">
-                        {slug} <br />
-                        <span className="text-slate-500">Security Audit</span>
+                    <h2 className="text-4xl font-semibold text-white mb-2 tracking-tight">
+                        {slug}
                     </h2>
+                    <p className="text-gray-400 text-lg">Security Audit & Cluster Analysis</p>
                 </motion.div>
 
-                <ControlPanel onRefresh={fetchReport} contestSlug={slug} />
+                <div className="mb-8">
+                    <ControlPanel onRefresh={fetchReport} contestSlug={slug} />
+                </div>
 
                 {loading ? (
                     <div className="py-32 flex flex-col items-center justify-center text-center">
-                        <Loader2 className="w-12 h-12 text-sky-500 animate-spin mb-4" />
-                        <p className="text-slate-400 font-mono animate-pulse">Retrieving intelligence...</p>
+                        <Loader2 className="w-10 h-10 text-white animate-spin mb-4" />
+                        <p className="text-gray-400 font-mono text-sm tracking-wide">Retrieving intelligence...</p>
                     </div>
                 ) : (
                     <ResultsDashboard clusters={clusters} />

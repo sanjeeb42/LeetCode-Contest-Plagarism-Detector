@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Code, User, Trophy, Loader2, AlertCircle, ShieldAlert, Bot } from 'lucide-react';
+import { ArrowLeft, Code, User, Trophy, Loader2, AlertCircle, ShieldAlert, Bot, Play } from 'lucide-react';
+import ReplayViewer from '../components/ReplayViewer';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 
@@ -63,92 +64,142 @@ function ClusterDetails() {
         }
     }, [cluster]);
 
+    const [overriding, setOverriding] = useState({});
+    const [viewingReplayFor, setViewingReplayFor] = useState(null);
+
+    const handleOverride = async (username, isAI) => {
+        setOverriding(prev => ({ ...prev, [username]: true }));
+        try {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/override_ai`, {
+                contest_slug: slug,
+                username: username,
+                is_ai: isAI
+            });
+            // Update local state to reflect override without needing a full reload
+            setCodes(prev => ({
+                ...prev,
+                [username]: {
+                    ...prev[username],
+                    analysis: {
+                        score: isAI ? 100 : 0,
+                        reasons: [`Manual override: ${isAI ? 'Flagged as AI' : 'Verified Human'}`]
+                    }
+                }
+            }));
+        } catch (error) {
+            console.error("Failed to override:", error);
+            alert("Failed to override AI status.");
+        } finally {
+            setOverriding(prev => ({ ...prev, [username]: false }));
+        }
+    };
+
     if (!cluster) return null;
 
     return (
-        <div className="min-h-screen bg-transparent relative z-10 p-8">
+        <div className="min-h-screen bg-transparent relative z-10 p-8 overflow-hidden">
             <div className="fixed inset-0 bg-grid z-[-1] pointer-events-none" />
+            <div className="glow-blue top-[-200px] right-[-200px]" />
 
-            <Link to={`/contest/${slug}`} className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
+            <Link to={`/contest/${slug}`} className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors">
                 <ArrowLeft className="w-4 h-4" /> Back to Dashboard
             </Link>
 
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl"
+                className="glass-panel overflow-hidden"
             >
                 {/* AI Warning Banner */}
                 {hasAIReference && (
-                    <div className="bg-red-500/10 border-b border-red-500/20 p-4 flex items-center justify-center gap-3">
-                        <ShieldAlert className="w-5 h-5 text-red-400 animate-pulse" />
-                        <span className="text-red-200 font-bold tracking-wide">CONFIRMED AI PLAGIARISM: Matches Reference Solution</span>
+                    <div className="bg-[#ff4500]/10 border-b border-[#ff4500]/20 p-4 flex items-center justify-center gap-3">
+                        <ShieldAlert className="w-5 h-5 text-[#ff4500] animate-pulse" />
+                        <span className="text-[#ff4500] font-medium tracking-wide text-sm">CONFIRMED AI PLAGIARISM: Matches Reference Solution</span>
                     </div>
                 )}
 
-                <div className="p-8 border-b border-white/10 flex justify-between items-center">
+                <div className="p-8 border-b border-white/10 flex justify-between items-center bg-white/[0.01]">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <h1 className="text-2xl font-bold text-white">Cluster Breakdown</h1>
-                            <span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 text-xs font-mono border border-sky-500/30">
+                            <h1 className="text-2xl font-semibold text-white">Cluster Breakdown</h1>
+                            <span className="px-2 py-0.5 rounded bg-white/5 text-gray-300 text-xs font-mono border border-white/10">
                                 {questionId}
                             </span>
                         </div>
-                        <p className="text-slate-400">Analysis of <span className="text-white font-bold">{cluster.size}</span> connected submissions</p>
+                        <p className="text-gray-400 text-sm">Analysis of <span className="text-white font-medium">{cluster.size}</span> connected submissions</p>
                     </div>
                 </div>
 
-                <div className="p-8">
+                <div className="p-0">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="border-b border-white/10 text-xs uppercase tracking-wider text-slate-500">
-                                    <th className="pb-4 pl-4 font-bold">User</th>
-                                    <th className="pb-4 font-bold w-32">Rank</th>
-                                    <th className="pb-4 font-bold">Code Submission</th>
+                                <tr className="border-b border-white/10 text-xs uppercase tracking-wider text-gray-500 bg-white/[0.02]">
+                                    <th className="py-4 pl-8 font-medium">User</th>
+                                    <th className="py-4 font-medium w-32">Rank</th>
+                                    <th className="py-4 font-medium">Code Submission</th>
                                 </tr>
                             </thead>
+                            <div className="h-4" />
                             <tbody className="divide-y divide-white/5">
                                 {cluster.members.map((member, i) => {
                                     const isRef = member.username.includes('_AI_REFERENCE_');
                                     return (
-                                        <tr key={i} className={clsx("transition-colors group", isRef ? "bg-red-500/5 hover:bg-red-500/10" : "hover:bg-white/5")}>
-                                            <td className="p-4 align-top">
+                                        <tr key={i} className={clsx("transition-colors group", isRef ? "bg-[#ff4500]/5 hover:bg-[#ff4500]/10" : "hover:bg-white/[0.02]")}>
+                                            <td className="p-6 pl-8 align-top">
                                                 {isRef ? (
-                                                    <div className="flex items-center gap-2 text-red-400 font-bold">
+                                                    <div className="flex items-center gap-2 text-[#ff4500] font-semibold text-sm">
                                                         <Bot className="w-4 h-4" />
                                                         AI REFERENCE
                                                     </div>
                                                 ) : (
-                                                    <a
-                                                        href={`https://leetcode.com/u/${member.slug || member.username}/`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="font-mono text-sky-400 font-medium hover:text-sky-300 hover:underline transition-colors block mb-1"
-                                                    >
-                                                        {member.username}
-                                                    </a>
+                                                    <div>
+                                                        <a
+                                                            href={`https://leetcode.com/u/${member.slug || member.username}/`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="font-mono text-white hover:text-gray-300 transition-colors block mb-2 text-sm"
+                                                        >
+                                                            {member.username}
+                                                        </a>
+                                                        <div className="flex flex-col gap-2 mt-3">
+                                                            <button 
+                                                                disabled={overriding[member.username]}
+                                                                onClick={() => handleOverride(member.username, true)}
+                                                                className="text-[10px] w-full text-left px-2 py-1.5 rounded bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 hover:text-white disabled:opacity-50 transition-all font-medium"
+                                                            >
+                                                                {overriding[member.username] ? '...' : '⚠ Mark AI'}
+                                                            </button>
+                                                            <button 
+                                                                disabled={overriding[member.username]}
+                                                                onClick={() => handleOverride(member.username, false)}
+                                                                className="text-[10px] w-full text-left px-2 py-1.5 rounded bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 hover:text-white disabled:opacity-50 transition-all font-medium"
+                                                            >
+                                                                {overriding[member.username] ? '...' : '✓ Mark Human'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 )}
                                             </td>
-                                            <td className="p-4 align-top">
-                                                <span className={clsx("font-mono text-sm", isRef ? "text-slate-500 italic" : "text-emerald-400")}>
+                                            <td className="p-6 align-top">
+                                                <span className={clsx("font-mono text-sm", isRef ? "text-gray-500 italic" : "text-gray-400")}>
                                                     {isRef ? "Reference" : `#${member.rank}`}
                                                 </span>
                                             </td>
-                                            <td className="p-4">
+                                            <td className="p-6">
                                                 <div className="relative">
                                                     {loadingCodes[member.username] ? (
-                                                        <div className="flex items-center gap-2 text-slate-500 text-sm h-32">
+                                                        <div className="flex items-center gap-2 text-gray-500 text-sm h-32">
                                                             <Loader2 className="w-4 h-4 animate-spin" /> Loading code...
                                                         </div>
                                                     ) : codes[member.username] ? (
                                                         <div className="relative group/code">
-                                                            {/* AI Badge Overlay */}
-                                                            {codes[member.username].analysis && (
-                                                                <div className="absolute top-2 right-2 z-10">
+                                                            {/* Action Bar: AI Badge & Replay */}
+                                                            <div className="flex justify-end items-center gap-3 mb-3 relative z-20">
+                                                                {codes[member.username].analysis && (
                                                                     <div className={clsx(
-                                                                        "px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider shadow-lg flex items-center gap-1 cursor-help backdrop-blur-md",
-                                                                        codes[member.username].analysis.score > 70 ? "bg-red-500/20 text-red-400 border border-red-500/30" :
+                                                                        "px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1 cursor-help backdrop-blur-md",
+                                                                        codes[member.username].analysis.score > 70 ? "bg-[#ff4500]/20 text-[#ff4500] border border-[#ff4500]/30" :
                                                                             codes[member.username].analysis.score > 30 ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" :
                                                                                 "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                                                                     )} title={codes[member.username].analysis.reasons.join(", ")}>
@@ -160,15 +211,23 @@ function ClusterDetails() {
                                                                             {codes[member.username].analysis.score}%
                                                                         </span>
                                                                     </div>
-                                                                </div>
-                                                            )}
+                                                                )}
+                                                                
+                                                                <button 
+                                                                    onClick={() => setViewingReplayFor(member.username)}
+                                                                    className="btn-secondary py-1 text-[11px]"
+                                                                >
+                                                                    <Play className="w-3 h-3" />
+                                                                    Watch Replay
+                                                                </button>
+                                                            </div>
 
-                                                            <pre className="font-mono text-xs bg-slate-950/50 p-4 rounded-lg border border-white/5 overflow-x-auto max-h-[300px] overflow-y-auto custom-scrollbar text-slate-300">
+                                                            <pre className="font-mono text-[13px] leading-relaxed bg-[#050505] p-5 rounded-xl border border-white/5 overflow-x-auto max-h-[300px] overflow-y-auto custom-scrollbar text-gray-300">
                                                                 <code>{codes[member.username].code}</code>
                                                             </pre>
                                                         </div>
                                                     ) : (
-                                                        <div className="text-slate-600 text-sm italic py-4">
+                                                        <div className="text-gray-600 text-sm italic py-4">
                                                             Code execution not available or failed to load.
                                                         </div>
                                                     )}
@@ -182,6 +241,15 @@ function ClusterDetails() {
                     </div>
                 </div>
             </motion.div>
+
+            {viewingReplayFor && (
+                <ReplayViewer 
+                    contestSlug={slug}
+                    questionId={questionId}
+                    username={viewingReplayFor}
+                    onClose={() => setViewingReplayFor(null)}
+                />
+            )}
         </div>
     );
 }

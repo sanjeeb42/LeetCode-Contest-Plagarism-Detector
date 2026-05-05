@@ -103,16 +103,22 @@ const ResultsDashboard = ({ clusters }) => {
     const questions = useMemo(() => Object.keys(clusters || {}).sort(), [clusters]);
     const [activeTab, setActiveTab] = useState(() => {
         const saved = sessionStorage.getItem('resultsActiveTab');
-        // If saved tab exists but questions aren't loaded yet, we'll still use it
         return saved || "Q4";
     });
+    const [showOnlyAI, setShowOnlyAI] = useState(false);
 
     React.useEffect(() => {
         sessionStorage.setItem('resultsActiveTab', activeTab);
     }, [activeTab]);
 
     // Ensure activeTab is valid when data likely loads/changes
-    const currentClusters = clusters?.[activeTab] || [];
+    const currentClusters = useMemo(() => {
+        let cls = clusters?.[activeTab] || [];
+        if (showOnlyAI) {
+            cls = cls.filter(cluster => cluster.members.some(m => m.is_ai_generated || m.username.includes('_AI_REFERENCE_')));
+        }
+        return cls;
+    }, [clusters, activeTab, showOnlyAI]);
 
     // Auto-select first available tab if activeTab is empty or invalid (on first load)
     React.useEffect(() => {
@@ -142,8 +148,23 @@ const ResultsDashboard = ({ clusters }) => {
                     <h2 className="text-lg font-bold text-white">Live Intelligence Feed</h2>
                 </div>
 
-                {/* Tabs */}
-                <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-xl border border-white/5 overflow-x-auto">
+                <div className="flex flex-col md:flex-row items-center gap-4">
+                    {/* AI Filter Toggle */}
+                    <button
+                        onClick={() => setShowOnlyAI(!showOnlyAI)}
+                        className={clsx(
+                            "flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-bold transition-all",
+                            showOnlyAI 
+                                ? "bg-red-500/10 border-red-500/50 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]" 
+                                : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-slate-300"
+                        )}
+                    >
+                        <Bot className="w-4 h-4" />
+                        AI Flagged Only
+                    </button>
+
+                    {/* Tabs */}
+                    <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-xl border border-white/5 overflow-x-auto">
                     {questions.map((q) => (
                         <button
                             key={q}
@@ -164,6 +185,7 @@ const ResultsDashboard = ({ clusters }) => {
                             )}
                         </button>
                     ))}
+                    </div>
                 </div>
             </div>
 

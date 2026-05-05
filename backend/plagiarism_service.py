@@ -228,6 +228,10 @@ def fetch_typing_replay(contest_slug, title_slug, username):
     from curl_cffi import requests
     import json
     
+    # Map username (which might be display name) to user_slug
+    slugs_map = load_user_slugs(contest_slug)
+    user_slug = slugs_map.get(username, username)
+    
     url = "https://leetcode.com/graphql/"
     fake_csrf = "fake_csrf_token_1234567890abcdef"
     headers = {
@@ -242,7 +246,7 @@ def fetch_typing_replay(contest_slug, title_slug, username):
         "variables": {
             "contestSlug": contest_slug,
             "questionSlug": title_slug,
-            "username": username
+            "username": user_slug
         },
         "operationName": "UserContestReplayEvents"
     }
@@ -255,8 +259,84 @@ def fetch_typing_replay(contest_slug, title_slug, username):
             if d:
                 return d.get("userContestReplayEvents") or []
     except Exception as e:
-        print(f"Error fetching typing replay for {username}: {e}")
+        print(f"Error fetching typing replay for {username} (slug: {user_slug}): {e}")
     return []
+
+def get_typing_replay_frames(contest_slug, title_slug, username):
+    events = fetch_typing_replay(contest_slug, title_slug, username)
+    frames = []
+    code_state = ""
+    
+    import json
+    for event in events:
+        event_type = str(event.get("eventType"))
+        event_data_str = event.get("eventData")
+        timestamp = event.get("timestamp", 0)
+        
+        if not event_data_str:
+            continue
+            
+        try:
+            event_data = json.loads(event_data_str)
+        except:
+            continue
+            
+        if event_type == "7":
+            if "c" in event_data:
+                code_state = event_data.get("c", "")
+            else:
+                changes = event_data.get("change", {}).get("changes", [])
+                for change in changes:
+                    code_state = code_state[:change.get("from", 0)] + change.get("insert", "") + code_state[change.get("to", 0):]
+            frames.append({"timestamp": timestamp, "code": code_state, "event": "flush"})
+            
+        elif event_type == "10":
+            if "c" in event_data:
+                changes = event_data.get("c", [])
+                for change in changes:
+                    if "l" in change and "t" in change:
+                        pos = change["l"]
+                        text = change["t"]
+                        code_state = code_state[:pos] + text + code_state[pos:]
+                    elif "l" in change and "d" in change:
+                        pos = change["l"]
+                        del_len = change["d"]
+                        code_state = code_state[:pos] + code_state[pos + del_len:]
+            else:
+                changes = event_data.get("change", {}).get("changes", [])
+                for change in changes:
+                    from_pos = change.get("from", 0)
+                    to_pos = change.get("to", 0)
+                    insert_text = change.get("insert", "")
+                    code_state = code_state[:from_pos] + insert_text + code_state[to_pos:]
+            
+            frames.append({"timestamp": timestamp, "code": code_state, "event": "typing"})
+            
+    return frames
+
+def set_manual_override(contest_slug, username, is_ai):
+    import json, os
+    output_dir, _, _, _ = get_paths(contest_slug)
+    override_path = os.path.join(output_dir, "manual_overrides.json")
+    overrides = {}
+    if os.path.exists(override_path):
+        try:
+            with open(override_path, "r") as f: overrides = json.load(f)
+        except: pass
+    overrides[username] = is_ai
+    with open(override_path, "w") as f:
+        json.dump(overrides, f)
+        
+    # Invalidate cache for this user
+    global _ai_cache
+    if _ai_cache is not None:
+        keys_to_delete = [k for k in _ai_cache.keys() if k.startswith(f"{username}_")]
+        for k in keys_to_delete:
+            del _ai_cache[k]
+        cache_path = os.path.join(output_dir, "ai_cache.json")
+        try:
+            with open(cache_path, "w") as f: json.dump(_ai_cache, f)
+        except: pass
 
 def analyze_ai_likelihood(code, language="text", username=None, contest_slug=None, title_slug=None):
     """
@@ -268,7 +348,23 @@ def analyze_ai_likelihood(code, language="text", username=None, contest_slug=Non
     
     if username and contest_slug:
         import hashlib, json
-        cache_path = os.path.join("resources", f"contest_report_{contest_slug}", "ai_cache.json")
+        output_dir, _, _, _ = get_paths(contest_slug)
+        
+        # Check manual overrides first
+        override_path = os.path.join(output_dir, "manual_overrides.json")
+        if os.path.exists(override_path):
+            try:
+                with open(override_path, "r") as f:
+                    overrides = json.load(f)
+                    if username in overrides:
+                        is_ai = overrides[username]
+                        return {
+                            "score": 100 if is_ai else 0,
+                            "reasons": [f"Manual override: {'Flagged as AI' if is_ai else 'Verified Human'}"]
+                        }
+            except: pass
+
+        cache_path = os.path.join(output_dir, "ai_cache.json")
         if _ai_cache is None:
             if os.path.exists(cache_path):
                 try:
@@ -394,15 +490,24 @@ Code:
         max_paste_len = 0
         import json
         for e in events:
-            if e.get("eventType") in ["7", "10"]:
+            if str(e.get("eventType")) in ["7", "10"]:
                 try:
                     event_data = json.loads(e.get("eventData", "{}"))
+                    # New format
                     changes = event_data.get("change", {}).get("changes", [])
                     for change in changes:
                         insert_text = change.get("insert", "")
-                        # Ignore the standard initial boilerplate loads which typically contain the class signature
                         if "class Solution" not in insert_text and "class " not in insert_text:
                             max_paste_len = max(max_paste_len, len(insert_text))
+                    
+                    # Old format
+                    old_changes = event_data.get("c", [])
+                    if isinstance(old_changes, list):
+                        for change in old_changes:
+                            if "t" in change:
+                                insert_text = change["t"]
+                                if "class Solution" not in insert_text and "class " not in insert_text:
+                                    max_paste_len = max(max_paste_len, len(insert_text))
                 except Exception:
                     pass
         
