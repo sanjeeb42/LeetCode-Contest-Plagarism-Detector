@@ -67,6 +67,14 @@ function ContestDashboard() {
                             <span>AI References</span>
                         </button>
 
+                        <Link
+                            to={`/contest/${slug}/ai-suspects`}
+                            className="btn-secondary py-1.5 !border-amber-500/30 !text-amber-400 hover:!bg-amber-500/10"
+                        >
+                            <ShieldAlert className="w-4 h-4" />
+                            <span>AI Suspects</span>
+                        </Link>
+
                         <div className="hidden md:flex items-center gap-4">
                             <div className="flex flex-col items-end">
                                 <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">Confidence</span>
