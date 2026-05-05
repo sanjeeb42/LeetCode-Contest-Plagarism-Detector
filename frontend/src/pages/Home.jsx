@@ -126,18 +126,23 @@ function Home() {
                             transition={{ duration: 0.8, ease: "easeOut" }}
                             className="max-w-2xl"
                         >
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFA116]/10 border border-[#FFA116]/20 text-[#FFA116] text-xs font-semibold uppercase tracking-wider mb-8">
-                                <span className="relative flex h-2 w-2">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFA116] opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FFA116]"></span>
-                                </span>
-                                v2.0 Live Analysis Engine
+                            <div className="flex flex-wrap items-center gap-3 mb-8">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFA116]/10 border border-[#FFA116]/20 text-[#FFA116] text-xs font-semibold uppercase tracking-wider">
+                                    <span className="relative flex h-2 w-2">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFA116] opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FFA116]"></span>
+                                    </span>
+                                    v2.0 Live Analysis Engine
+                                </div>
+                                <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 text-xs font-medium">
+                                    Developed by <span className="text-white ml-1 font-semibold">Sanjeeb</span>
+                                </div>
                             </div>
                             <h1 className="text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6 leading-[1.1]">
-                                Unmask Code Plagiarism with <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFA116] to-amber-300">Unprecedented</span> Accuracy.
+                                Stop Code Plagiarism <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFA116] to-amber-300">Dead</span> in its Tracks.
                             </h1>
                             <p className="text-lg text-gray-400 mb-10 leading-relaxed">
-                                Go beyond simple text comparison. Our deep-analysis engine uses Abstract Syntax Trees, AI-generation heuristics, and live typing forensics to detect cheating in competitive programming.
+                                Spot copied code, AI-generated solutions, and fake typing replays instantly. Keep your contests fair with just one click.
                             </p>
                             <div className="flex flex-wrap gap-4">
                                 <button 
