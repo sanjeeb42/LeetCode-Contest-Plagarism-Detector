@@ -262,12 +262,32 @@ def fetch_typing_replay(contest_slug, title_slug, username):
         print(f"Error fetching typing replay for {username} (slug: {user_slug}): {e}")
     return []
 
+def get_question_id(contest_slug, title_slug):
+    """Returns the numeric question_id for a given title_slug."""
+    output_dir, _, _, _ = get_paths(contest_slug)
+    raw_path = os.path.join(output_dir, "raw_data.json")
+    try:
+        import json
+        with open(raw_path, "r") as f:
+            data = json.load(f)
+            for q in data.get("questions", []):
+                if q.get("title_slug") == title_slug:
+                    return str(q.get("question_id"))
+    except Exception:
+        pass
+    return None
+
 def get_typing_replay_frames(contest_slug, title_slug, username):
     events = fetch_typing_replay(contest_slug, title_slug, username)
     frames = []
     code_state = ""
     
+    # Get the numeric questionId to filter events for this specific question
+    target_qid = get_question_id(contest_slug, title_slug)
     import json
+    
+    # Pre-parse all events
+    parsed_events = []
     for event in events:
         event_type = str(event.get("eventType"))
         event_data_str = event.get("eventData")
@@ -275,10 +295,25 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
         
         if not event_data_str:
             continue
-            
         try:
             event_data = json.loads(event_data_str)
         except:
+            continue
+        parsed_events.append((event_type, event_data, timestamp))
+    
+    for i, (event_type, event_data, timestamp) in enumerate(parsed_events):
+        event_qid = str(event_data.get("questionId", ""))
+        
+        # Filter by questionId
+        if target_qid and event_qid and event_qid != target_qid:
+            # Exception: switch_language events (types 0, 2) have the SOURCE question's ID.
+            # Include them if the NEXT event belongs to our target question.
+            if event_type in ("0", "2"):
+                if i + 1 < len(parsed_events):
+                    next_qid = str(parsed_events[i + 1][1].get("questionId", ""))
+                    if next_qid == target_qid:
+                        lang = event_data.get("lang", "unknown")
+                        frames.append({"timestamp": timestamp, "code": code_state, "event": "switch_language", "lang": lang})
             continue
             
         if event_type == "7":
@@ -298,16 +333,22 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
             
         elif event_type == "10":
             if "c" in event_data:
-                changes = event_data.get("c", [])
-                for change in changes:
-                    if "l" in change and "t" in change:
-                        pos = change["l"]
-                        text = change["t"]
-                        code_state = code_state[:pos] + text + code_state[pos:]
-                    elif "l" in change and "d" in change:
-                        pos = change["l"]
-                        del_len = change["d"]
-                        code_state = code_state[:pos] + code_state[pos + del_len:]
+                old_changes = event_data["c"]
+                if isinstance(old_changes, str):
+                    code_state = old_changes
+                elif isinstance(old_changes, list):
+                    for change in old_changes:
+                        if "t" in change:
+                            insert_text = change["t"]
+                            pos = change.get("l", len(code_state))
+                            code_state = code_state[:pos] + insert_text + code_state[pos:]
+                            
+                            if len(insert_text) > 50:
+                                frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text)})
+                        elif "l" in change and "d" in change:
+                            pos = change["l"]
+                            del_len = change["d"]
+                            code_state = code_state[:pos] + code_state[pos + del_len:]
             else:
                 changes = event_data.get("change", {}).get("changes", [])
                 for change in changes:
