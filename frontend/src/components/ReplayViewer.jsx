@@ -66,6 +66,11 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
         return best;
     }, [frames, currentTime, startTime]);
 
+    // Extract notable events for the timeline sidebar
+    const timelineEvents = React.useMemo(() => {
+        return frames.filter(f => ['run_code', 'submit_code', 'switch_language', 'external_paste'].includes(f.event));
+    }, [frames]);
+
     // Auto-play logic based on time
     useEffect(() => {
         let interval;
@@ -112,8 +117,10 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-hidden flex flex-col p-6 bg-slate-950">
+                {/* Content Area */}
+                <div className="flex-1 overflow-hidden flex bg-slate-950">
+                    {/* Left: Code & Controls */}
+                    <div className="flex-1 flex flex-col p-6 relative border-r border-white/5 min-w-0">
                     {loading ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4">
                             <Loader2 className="w-8 h-8 animate-spin text-sky-500" />
@@ -197,6 +204,67 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                                 <p className="text-center text-[10px] text-slate-500 mt-2 italic">Drag slider to scrub through the exact timing of the user's keystrokes.</p>
                             </div>
                         </>
+                    )}
+                    </div>
+                    
+                    {/* Right: Timeline Sidebar */}
+                    {!loading && !error && (
+                        <div className="w-64 bg-slate-900/30 flex flex-col overflow-hidden">
+                            <div className="p-4 border-b border-white/5 bg-slate-900/50">
+                                <h4 className="text-white font-semibold text-sm">Timeline</h4>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                                {timelineEvents.length === 0 ? (
+                                    <div className="text-xs text-slate-500 text-center mt-4">No significant events</div>
+                                ) : (
+                                    timelineEvents.map((evt, idx) => (
+                                        <div 
+                                            key={idx} 
+                                            onClick={() => {
+                                                setCurrentTime(evt.timestamp - startTime);
+                                                setIsPlaying(false);
+                                            }}
+                                            className={clsx(
+                                                "p-3 rounded-lg border cursor-pointer transition-all",
+                                                evt.timestamp - startTime <= currentTime && evt.timestamp - startTime > currentTime - 2000
+                                                    ? "bg-slate-800 border-sky-500/50" 
+                                                    : "bg-slate-800/40 border-white/5 hover:border-white/20 hover:bg-slate-800"
+                                            )}
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-xs font-semibold text-slate-300">
+                                                    {evt.event === 'run_code' && 'Run Code'}
+                                                    {evt.event === 'submit_code' && 'Submit Code'}
+                                                    {evt.event === 'switch_language' && 'Switch Language'}
+                                                    {evt.event === 'external_paste' && 'External Paste'}
+                                                </span>
+                                                <span className="text-[10px] font-mono text-slate-500">{formatTime(evt.timestamp - startTime)}</span>
+                                            </div>
+                                            
+                                            {/* Status Badge */}
+                                            {evt.event === 'switch_language' && (
+                                                <span className="inline-block px-2 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300">{evt.lang}</span>
+                                            )}
+                                            {evt.event === 'external_paste' && (
+                                                <span className="inline-block px-2 py-0.5 rounded text-[10px] bg-red-500/10 text-red-400 border border-red-500/20">
+                                                    size &gt; {evt.chars} chars
+                                                </span>
+                                            )}
+                                            {(evt.event === 'run_code' || evt.event === 'submit_code') && (
+                                                <span className={clsx(
+                                                    "inline-block px-2 py-0.5 rounded text-[10px] border",
+                                                    evt.status === 10 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                                                    evt.status === 11 ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                                                    "bg-slate-700 text-slate-300 border-transparent"
+                                                )}>
+                                                    {evt.status === 10 ? 'Accepted' : evt.status === 11 ? 'Wrong Answer' : `Status: ${evt.status}`}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>

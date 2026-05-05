@@ -289,7 +289,11 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
                 for change in changes:
                     from_pos = change.get("from", 0)
                     to_pos = change.get("to", from_pos)
-                    code_state = code_state[:from_pos] + change.get("insert", "") + code_state[to_pos:]
+                    insert_text = change.get("insert", "")
+                    code_state = code_state[:from_pos] + insert_text + code_state[to_pos:]
+                    
+                    if len(insert_text) > 50 and not event_data.get("isFromInside", False):
+                        frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text)})
             frames.append({"timestamp": timestamp, "code": code_state, "event": "flush"})
             
         elif event_type == "10":
@@ -311,8 +315,23 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
                     to_pos = change.get("to", from_pos)
                     insert_text = change.get("insert", "")
                     code_state = code_state[:from_pos] + insert_text + code_state[to_pos:]
+                    
+                    if len(insert_text) > 50 and not event_data.get("isFromInside", False):
+                        frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text)})
             
             frames.append({"timestamp": timestamp, "code": code_state, "event": "typing"})
+            
+        elif event_type in ("0", "2"):
+            lang = event_data.get("lang", "unknown")
+            frames.append({"timestamp": timestamp, "code": code_state, "event": "switch_language", "lang": lang})
+            
+        elif event_type == "4":
+            status = event_data.get("result", {}).get("status", 0)
+            frames.append({"timestamp": timestamp, "code": code_state, "event": "run_code", "status": status})
+            
+        elif event_type == "5":
+            status = event_data.get("result", {}).get("status", 0)
+            frames.append({"timestamp": timestamp, "code": code_state, "event": "submit_code", "status": status})
             
     return frames
 
