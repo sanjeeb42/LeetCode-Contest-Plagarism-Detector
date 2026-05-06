@@ -232,6 +232,25 @@ def fetch_typing_replay(contest_slug, title_slug, username):
     slugs_map = load_user_slugs(contest_slug)
     user_slug = slugs_map.get(username, username)
     
+    # --- Cache: check for cached replay events on disk ---
+    output_dir, _, _, _ = get_paths(contest_slug)
+    cache_dir = os.path.join(output_dir, "replays")
+    os.makedirs(cache_dir, exist_ok=True)
+    # Sanitize filename: replace slashes and special chars
+    safe_user = user_slug.replace("/", "_").replace("\\", "_")
+    safe_slug = title_slug.replace("/", "_").replace("\\", "_")
+    cache_file = os.path.join(cache_dir, f"{safe_user}_{safe_slug}.json")
+    
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, "r") as f:
+                cached = json.load(f)
+                if cached:
+                    return cached
+        except Exception:
+            pass
+    
+    # --- Live fetch from LeetCode API ---
     url = "https://leetcode.com/graphql/"
     fake_csrf = "fake_csrf_token_1234567890abcdef"
     headers = {
@@ -261,6 +280,12 @@ def fetch_typing_replay(contest_slug, title_slug, username):
                 if d:
                     events = d.get("userContestReplayEvents") or []
                     if events:
+                        # Save to cache
+                        try:
+                            with open(cache_file, "w") as f:
+                                json.dump(events, f)
+                        except Exception:
+                            pass
                         return events
             # Retry after a short delay if no events returned
             if attempt < 2:
