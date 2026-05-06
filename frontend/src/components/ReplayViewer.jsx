@@ -19,7 +19,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                     question_id: questionId,
                     username: username
                 });
-                
+
                 if (resp.data.frames && resp.data.frames.length > 0) {
                     // Convert ISO 8601 timestamp strings to millisecond numbers
                     const parsedFrames = resp.data.frames.map(f => ({
@@ -53,7 +53,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
         let low = 0;
         let high = frames.length - 1;
         let best = 0;
-        
+
         while (low <= high) {
             const mid = Math.floor((low + high) / 2);
             if (frames[mid].timestamp - startTime <= currentTime) {
@@ -142,11 +142,11 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md" onClick={onClose}>
-            <div 
+            <div
                 className="bg-[#0d1117] border border-white/10 rounded-2xl w-full max-w-6xl shadow-2xl shadow-black/50 overflow-hidden flex flex-col h-full max-h-[92vh]"
                 onClick={(e) => e.stopPropagation()}
             >
-                
+
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#161b22]">
                     <div className="flex items-center gap-3">
@@ -179,129 +179,129 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                 <div className="flex-1 overflow-hidden flex">
                     {/* Left: Code & Controls */}
                     <div className="flex-1 flex flex-col min-w-0">
-                    {loading ? (
-                        <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-3">
-                            <div className="relative">
-                                <div className="w-12 h-12 rounded-full border-2 border-sky-500/20 border-t-sky-500 animate-spin" />
+                        {loading ? (
+                            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-3">
+                                <div className="relative">
+                                    <div className="w-12 h-12 rounded-full border-2 border-sky-500/20 border-t-sky-500 animate-spin" />
+                                </div>
+                                <p className="text-sm text-slate-500">Fetching replay events...</p>
                             </div>
-                            <p className="text-sm text-slate-500">Fetching replay events...</p>
-                        </div>
-                    ) : error ? (
-                        <div className="flex-1 flex items-center justify-center">
-                            <div className="bg-red-500/5 border border-red-500/20 px-8 py-5 rounded-xl text-center">
-                                <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                                <p className="text-red-400 text-sm">{error}</p>
+                        ) : error ? (
+                            <div className="flex-1 flex items-center justify-center">
+                                <div className="bg-red-500/5 border border-red-500/20 px-8 py-5 rounded-xl text-center">
+                                    <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                                    <p className="text-red-400 text-sm">{error}</p>
+                                </div>
                             </div>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Code Editor Area */}
-                            <div className="flex-1 overflow-auto bg-[#0d1117] p-4 custom-scrollbar font-mono text-slate-300">
-                                {renderCode(currentCode)}
-                            </div>
-
-                            {/* Controls Bar */}
-                            <div className="border-t border-white/[0.06] bg-[#161b22] px-5 py-3">
-                                {/* Seek Bar */}
-                                <div className="relative h-1.5 bg-slate-800 rounded-full mb-3 cursor-pointer group"
-                                    onClick={(e) => {
-                                        const rect = e.currentTarget.getBoundingClientRect();
-                                        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                                        setCurrentTime(pct * duration);
-                                        setIsPlaying(false);
-                                    }}
-                                >
-                                    {/* Progress fill */}
-                                    <div 
-                                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-sky-500 to-blue-500 rounded-full transition-[width] duration-75"
-                                        style={{ width: `${progress}%` }}
-                                    />
-                                    {/* Scrubber handle */}
-                                    <div 
-                                        className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg shadow-black/30 border-2 border-sky-500 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                                        style={{ left: `calc(${progress}% - 7px)` }}
-                                    />
-                                    {/* Event markers on the seek bar */}
-                                    {timelineEvents.map((evt, i) => {
-                                        const evtPct = duration > 0 ? ((evt.timestamp - startTime) / duration) * 100 : 0;
-                                        return (
-                                            <div
-                                                key={i}
-                                                className={clsx(
-                                                    "absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full",
-                                                    evt.event === 'external_paste' ? 'bg-rose-400' :
-                                                    evt.event === 'submit_code' ? 'bg-emerald-400' :
-                                                    evt.event === 'run_code' ? 'bg-sky-400' :
-                                                    'bg-violet-400'
-                                                )}
-                                                style={{ left: `${evtPct}%` }}
-                                                title={`${getEventStyle(evt.event).label} at ${formatTime(evt.timestamp - startTime)}`}
-                                            />
-                                        );
-                                    })}
+                        ) : (
+                            <>
+                                {/* Code Editor Area */}
+                                <div className="flex-1 overflow-auto bg-[#0d1117] p-4 custom-scrollbar font-mono text-slate-300">
+                                    {renderCode(currentCode)}
                                 </div>
 
-                                {/* Playback Controls */}
-                                <div className="flex items-center gap-3">
-                                    {/* Time */}
-                                    <span className="text-xs font-mono text-slate-500 w-[90px]">
-                                        <span className="text-white">{formatTime(currentTime)}</span> / {formatTime(duration)}
-                                    </span>
-
-                                    {/* Transport Controls */}
-                                    <div className="flex items-center gap-1 mx-auto">
-                                        <button 
-                                            onClick={() => { setCurrentTime(0); setIsPlaying(false); }}
-                                            className="p-2 text-slate-500 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
-                                            title="Rewind"
-                                        >
-                                            <SkipBack className="w-4 h-4" />
-                                        </button>
-                                        
-                                        <button 
-                                            onClick={() => setIsPlaying(!isPlaying)}
-                                            className={clsx(
-                                                "p-2.5 rounded-full transition-all",
-                                                isPlaying 
-                                                    ? "bg-white/10 text-white hover:bg-white/15" 
-                                                    : "bg-sky-500 text-white hover:bg-sky-400 shadow-lg shadow-sky-500/20"
-                                            )}
-                                        >
-                                            {isPlaying ? <Pause className="w-4 h-4"/> : <Play className="w-4 h-4 ml-0.5"/>}
-                                        </button>
-
-                                        <button 
-                                            onClick={() => { setCurrentTime(duration); setIsPlaying(false); }}
-                                            className="p-2 text-slate-500 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
-                                            title="End"
-                                        >
-                                            <SkipForward className="w-4 h-4" />
-                                        </button>
+                                {/* Controls Bar */}
+                                <div className="border-t border-white/[0.06] bg-[#161b22] px-5 py-3">
+                                    {/* Seek Bar */}
+                                    <div className="relative h-1.5 bg-slate-800 rounded-full mb-3 cursor-pointer group"
+                                        onClick={(e) => {
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                                            setCurrentTime(pct * duration);
+                                            setIsPlaying(false);
+                                        }}
+                                    >
+                                        {/* Progress fill */}
+                                        <div
+                                            className="absolute inset-y-0 left-0 bg-gradient-to-r from-sky-500 to-blue-500 rounded-full transition-[width] duration-75"
+                                            style={{ width: `${progress}%` }}
+                                        />
+                                        {/* Scrubber handle */}
+                                        <div
+                                            className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg shadow-black/30 border-2 border-sky-500 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                            style={{ left: `calc(${progress}% - 7px)` }}
+                                        />
+                                        {/* Event markers on the seek bar */}
+                                        {timelineEvents.map((evt, i) => {
+                                            const evtPct = duration > 0 ? ((evt.timestamp - startTime) / duration) * 100 : 0;
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className={clsx(
+                                                        "absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full",
+                                                        evt.event === 'external_paste' ? 'bg-rose-400' :
+                                                            evt.event === 'submit_code' ? 'bg-emerald-400' :
+                                                                evt.event === 'run_code' ? 'bg-sky-400' :
+                                                                    'bg-violet-400'
+                                                    )}
+                                                    style={{ left: `${evtPct}%` }}
+                                                    title={`${getEventStyle(evt.event).label} at ${formatTime(evt.timestamp - startTime)}`}
+                                                />
+                                            );
+                                        })}
                                     </div>
 
-                                    {/* Speed Selector */}
-                                    <div className="flex items-center gap-1.5">
-                                        {[1, 2, 5, 10, 20].map(speed => (
+                                    {/* Playback Controls */}
+                                    <div className="flex items-center gap-3">
+                                        {/* Time */}
+                                        <span className="text-xs font-mono text-slate-500 w-[90px]">
+                                            <span className="text-white">{formatTime(currentTime)}</span> / {formatTime(duration)}
+                                        </span>
+
+                                        {/* Transport Controls */}
+                                        <div className="flex items-center gap-1 mx-auto">
                                             <button
-                                                key={speed}
-                                                onClick={() => setPlaybackSpeed(speed)}
+                                                onClick={() => { setCurrentTime(0); setIsPlaying(false); }}
+                                                className="p-2 text-slate-500 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                                                title="Rewind"
+                                            >
+                                                <SkipBack className="w-4 h-4" />
+                                            </button>
+
+                                            <button
+                                                onClick={() => setIsPlaying(!isPlaying)}
                                                 className={clsx(
-                                                    "px-2 py-1 rounded text-[11px] font-semibold transition-colors",
-                                                    playbackSpeed === speed
-                                                        ? "bg-sky-500/20 text-sky-400"
-                                                        : "text-slate-500 hover:text-white hover:bg-white/5"
+                                                    "p-2.5 rounded-full transition-all",
+                                                    isPlaying
+                                                        ? "bg-white/10 text-white hover:bg-white/15"
+                                                        : "bg-sky-500 text-white hover:bg-sky-400 shadow-lg shadow-sky-500/20"
                                                 )}
                                             >
-                                                {speed}x
+                                                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                                             </button>
-                                        ))}
+
+                                            <button
+                                                onClick={() => { setCurrentTime(duration); setIsPlaying(false); }}
+                                                className="p-2 text-slate-500 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                                                title="End"
+                                            >
+                                                <SkipForward className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        {/* Speed Selector */}
+                                        <div className="flex items-center gap-1.5">
+                                            {[1, 2, 5, 10, 20].map(speed => (
+                                                <button
+                                                    key={speed}
+                                                    onClick={() => setPlaybackSpeed(speed)}
+                                                    className={clsx(
+                                                        "px-2 py-1 rounded text-[11px] font-semibold transition-colors",
+                                                        playbackSpeed === speed
+                                                            ? "bg-sky-500/20 text-sky-400"
+                                                            : "text-slate-500 hover:text-white hover:bg-white/5"
+                                                    )}
+                                                >
+                                                    {speed}x
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </>
-                    )}
+                            </>
+                        )}
                     </div>
-                    
+
                     {/* Right: Timeline Sidebar */}
                     {!loading && !error && (
                         <div className="w-56 bg-[#161b22] flex flex-col overflow-hidden border-l border-white/[0.06]">
@@ -317,12 +317,12 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                                     timelineEvents.map((evt, idx) => {
                                         const style = getEventStyle(evt.event);
                                         const EventIcon = style.icon;
-                                        const isActive = evt.timestamp - startTime <= currentTime && 
-                                                         evt.timestamp - startTime > currentTime - 3000;
-                                        
+                                        const isActive = evt.timestamp - startTime <= currentTime &&
+                                            evt.timestamp - startTime > currentTime - 3000;
+
                                         return (
-                                            <div 
-                                                key={idx} 
+                                            <div
+                                                key={idx}
                                                 onClick={() => {
                                                     setCurrentTime(evt.timestamp - startTime);
                                                     setIsPlaying(false);
@@ -330,7 +330,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                                                 className={clsx(
                                                     "p-2.5 rounded-lg border cursor-pointer transition-all group/evt",
                                                     isActive
-                                                        ? `${style.bg} ${style.border}` 
+                                                        ? `${style.bg} ${style.border}`
                                                         : "border-transparent hover:bg-white/[0.03] hover:border-white/5"
                                                 )}
                                             >
@@ -343,7 +343,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                                                         {formatTime(evt.timestamp - startTime)}
                                                     </span>
                                                 </div>
-                                                
+
                                                 {/* Meta */}
                                                 {evt.event === 'switch_language' && (
                                                     <span className={clsx("inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold", style.bg, style.color)}>
@@ -359,8 +359,8 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                                                     <span className={clsx(
                                                         "inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold",
                                                         evt.status === 10 ? "bg-emerald-500/10 text-emerald-400" :
-                                                        evt.status === 11 ? "bg-red-500/10 text-red-400" :
-                                                        "bg-slate-700 text-slate-400"
+                                                            evt.status === 11 ? "bg-red-500/10 text-red-400" :
+                                                                "bg-slate-700 text-slate-400"
                                                     )}>
                                                         {evt.status === 10 ? 'Accepted' : evt.status === 11 ? 'Wrong Answer' : `Status: ${evt.status}`}
                                                     </span>
