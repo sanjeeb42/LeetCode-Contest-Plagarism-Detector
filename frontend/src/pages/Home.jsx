@@ -90,7 +90,7 @@ function Home() {
     };
 
     return (
-        <div className="min-h-screen bg-[#050403] relative overflow-hidden flex flex-col font-sans">
+        <div className="min-h-screen bg-[#050403] relative flex flex-col font-sans" style={{ overflow: 'clip' }}>
             {/* Base Atmosphere */}
             <div className="fixed inset-0 fractalNoise pointer-events-none opacity-50 z-0" />
             
@@ -152,8 +152,11 @@ function Home() {
                                     View Active Scans
                                     <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                                 </button>
-                                <Link to="/generate-report" className="btn-secondary py-3 px-8 text-sm">
+                                <a href="#investigations" className="btn-secondary py-3 px-8 text-sm">
                                     Start New Scan
+                                </a>
+                                <Link to="/generate-report" className="btn-secondary py-3 px-8 text-sm">
+                                    Process Report
                                 </Link>
                             </div>
                         </motion.div>
