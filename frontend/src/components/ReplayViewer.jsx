@@ -12,6 +12,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
     useEffect(() => {
+        let cancelled = false;
         const fetchReplay = async () => {
             try {
                 const resp = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/typing_replay`, {
@@ -19,6 +20,8 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                     question_id: questionId,
                     username: username
                 });
+
+                if (cancelled) return;
 
                 if (resp.data.frames && resp.data.frames.length > 0) {
                     // Convert ISO 8601 timestamp strings to millisecond numbers
@@ -34,13 +37,15 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                     setError("No replay events found for this user/question.");
                 }
             } catch (err) {
+                if (cancelled) return;
                 console.error("Failed to load replay:", err);
                 setError("Failed to fetch typing replay from server.");
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
         fetchReplay();
+        return () => { cancelled = true; };
     }, [contestSlug, questionId, username]);
 
     const startTime = frames.length > 0 ? frames[0].timestamp : 0;

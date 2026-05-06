@@ -252,12 +252,19 @@ def fetch_typing_replay(contest_slug, title_slug, username):
     }
 
     try:
-        response = requests.post(url, headers=headers, json=body, impersonate="chrome", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            d = data.get("data")
-            if d:
-                return d.get("userContestReplayEvents") or []
+        import time
+        for attempt in range(3):
+            response = requests.post(url, headers=headers, json=body, impersonate="chrome", timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                d = data.get("data")
+                if d:
+                    events = d.get("userContestReplayEvents") or []
+                    if events:
+                        return events
+            # Retry after a short delay if no events returned
+            if attempt < 2:
+                time.sleep(1)
     except Exception as e:
         print(f"Error fetching typing replay for {username} (slug: {user_slug}): {e}")
     return []
