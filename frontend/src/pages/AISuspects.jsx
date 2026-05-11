@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, ShieldAlert, Cpu, Loader2, AlertTriangle, CheckCircle, Eye, Play, ChevronDown, ChevronUp, ExternalLink, Filter } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Cpu, Loader2, AlertTriangle, CheckCircle, Eye, Play, ChevronDown, ChevronUp, ExternalLink, Filter, Search } from 'lucide-react';
 import ReplayViewer from '../components/ReplayViewer';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -13,6 +13,7 @@ function AISuspects() {
     const [error, setError] = useState(null);
     const [filterFlagged, setFilterFlagged] = useState(false);
     const [sortBy, setSortBy] = useState('ai_score'); // 'ai_score' or 'rank'
+    const [searchQuery, setSearchQuery] = useState('');
     const [expandedUser, setExpandedUser] = useState(null);
     const [viewingReplayFor, setViewingReplayFor] = useState(null);
 
@@ -50,6 +51,10 @@ function AISuspects() {
 
     const filteredSuspects = data?.suspects
         ?.filter(s => !filterFlagged || s.total_ai_score >= 60)
+        ?.filter(s => !searchQuery || 
+            s.username.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            (s.user_slug && s.user_slug.toLowerCase().includes(searchQuery.toLowerCase()))
+        )
         ?.sort((a, b) => {
             if (sortBy === 'ai_score') return b.total_ai_score - a.total_ai_score;
             return a.rank - b.rank;
@@ -129,6 +134,16 @@ function AISuspects() {
                                     <Filter className="w-4 h-4" />
                                     {filterFlagged ? 'Showing Flagged Only' : 'Show All Users'}
                                 </button>
+                                <div className="relative">
+                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search username..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="pl-9 pr-4 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-400/50 transition-colors"
+                                    />
+                                </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-xs text-gray-500">Sort by:</span>
@@ -174,6 +189,7 @@ function AISuspects() {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-white font-semibold truncate">{suspect.username}</span>
+                                                        <span className="text-gray-500 text-xs truncate">@{suspect.user_slug}</span>
                                                         <a
                                                             href={`https://leetcode.com/u/${suspect.user_slug}`}
                                                             target="_blank"
