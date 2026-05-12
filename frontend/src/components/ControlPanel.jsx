@@ -110,6 +110,7 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
     });
     const [pageLimit, setPageLimit] = useState(10);
     const [scanLimit, setScanLimit] = useState(500);
+    const [selectedQuestions, setSelectedQuestions] = useState(['Q3', 'Q4']);
 
     const pollStatus = async (taskName) => {
         const interval = setInterval(async () => {
@@ -197,18 +198,39 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
                 color="amber"
                 status={taskStatus.top500_scan.status}
                 progress={taskStatus.top500_scan.progress}
-                onClick={() => triggerTask('top500_scan', 'top500_scan', { limit: scanLimit || 500 })}
+                onClick={() => triggerTask('top500_scan', 'top500_scan', { limit: scanLimit || 500, questions: selectedQuestions.length > 0 ? selectedQuestions : ["Q3", "Q4"] })}
                 extraAction={
-                    <div className="flex flex-col w-24">
-                        <label className="text-[10px] text-slate-500 font-mono mb-1">USERS</label>
-                        <input
-                            type="number"
-                            min="1"
-                            max="500"
-                            value={scanLimit}
-                            onChange={(e) => setScanLimit(e.target.value === '' ? '' : parseInt(e.target.value))}
-                            className="bg-slate-900 border border-slate-700 rounded text-white text-sm px-2 py-1 outline-none focus:border-amber-500"
-                        />
+                    <div className="flex gap-4">
+                        <div className="flex flex-col w-16">
+                            <label className="text-[10px] text-slate-500 font-mono mb-1">USERS</label>
+                            <input
+                                type="number"
+                                min="1"
+                                max="500"
+                                value={scanLimit}
+                                onChange={(e) => setScanLimit(e.target.value === '' ? '' : parseInt(e.target.value))}
+                                className="bg-slate-900 border border-slate-700 rounded text-white text-sm px-2 py-1 outline-none focus:border-amber-500"
+                            />
+                        </div>
+                        <div className="flex flex-col">
+                            <label className="text-[10px] text-slate-500 font-mono mb-1">QUESTIONS</label>
+                            <div className="flex gap-2 items-center h-full pb-1">
+                                {['Q1', 'Q2', 'Q3', 'Q4'].map(q => (
+                                    <label key={q} className="flex items-center gap-1 text-xs text-gray-300 cursor-pointer hover:text-white">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedQuestions.includes(q)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) setSelectedQuestions([...selectedQuestions, q]);
+                                                else setSelectedQuestions(selectedQuestions.filter(x => x !== q));
+                                            }}
+                                            className="w-3 h-3 accent-amber-500"
+                                        />
+                                        {q}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 }
             />

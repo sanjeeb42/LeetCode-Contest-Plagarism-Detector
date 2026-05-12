@@ -75,13 +75,13 @@ def run_analyze_task(slug):
     except Exception as e:
         task_status[slug]["analyze"] = {"status": "error", "message": str(e)}
 
-def run_top500_scan_task(slug, limit=500):
+def run_top500_scan_task(slug, limit=500, questions_to_scan=None):
     global task_status
     try:
         def update_progress(p):
             task_status[slug]["top500_scan"]["progress"] = p
 
-        result = plagiarism_detector.run_top500_scan(slug, n=limit, progress_callback=update_progress)
+        result = plagiarism_detector.run_top500_scan(slug, n=limit, progress_callback=update_progress, questions_to_scan=questions_to_scan)
         if "error" in result:
             task_status[slug]["top500_scan"] = {"status": "error", "message": result["error"]}
         else:
@@ -295,7 +295,8 @@ def trigger_top500_scan():
     task_status[slug]["top500_scan"] = {"status": "running", "message": "Starting scan...", "progress": 0}
 
     limit = int(data.get("limit", 500))
-    thread = threading.Thread(target=run_top500_scan_task, args=(slug, limit))
+    questions_to_scan = data.get("questions", ["Q3", "Q4"])
+    thread = threading.Thread(target=run_top500_scan_task, args=(slug, limit, questions_to_scan))
     thread.start()
     return jsonify({"message": f"Top 500 AI scan started for {slug}"}), 202
 

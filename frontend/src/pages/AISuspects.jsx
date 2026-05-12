@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, ShieldAlert, Cpu, Loader2, AlertTriangle, CheckCircle, Eye, Play, ChevronDown, ChevronUp, ExternalLink, Filter, Search } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Cpu, Loader2, AlertTriangle, CheckCircle, Eye, Play, ChevronDown, ChevronUp, ExternalLink, Filter, Search, RefreshCw } from 'lucide-react';
 import ReplayViewer from '../components/ReplayViewer';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -11,23 +11,36 @@ function AISuspects() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [filterFlagged, setFilterFlagged] = useState(false);
+    const [minAiScore, setMinAiScore] = useState(60);
+    const [filterQuestion, setFilterQuestion] = useState('All');
     const [sortBy, setSortBy] = useState('ai_score'); // 'ai_score' or 'rank'
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedUser, setExpandedUser] = useState(null);
     const [viewingReplayFor, setViewingReplayFor] = useState(null);
 
-    useEffect(() => {
-        const fetchResults = async () => {
-            try {
-                const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/top500_results?contest_slug=${slug}`);
-                setData(resp.data);
-            } catch (err) {
-                setError(err.response?.data?.error || 'No scan results found. Run the Top 500 scan first.');
-            } finally {
+    const fetchResults = async (force = false) => {
+        if (!force) {
+            const cached = localStorage.getItem(`top500_${slug}`);
+            if (cached) {
+                setData(JSON.parse(cached));
                 setLoading(false);
+                return;
             }
-        };
+        }
+        setLoading(true);
+        setError(null);
+        try {
+            const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/top500_results?contest_slug=${slug}`);
+            setData(resp.data);
+            localStorage.setItem(`top500_${slug}`, JSON.stringify(resp.data));
+        } catch (err) {
+            setError(err.response?.data?.error || 'No scan results found. Run the Top 500 scan first.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchResults();
     }, [slug]);
 
@@ -50,7 +63,10 @@ function AISuspects() {
     };
 
     const filteredSuspects = data?.suspects
-        ?.filter(s => !filterFlagged || s.total_ai_score >= 60)
+        ?.filter(s => {
+            if (filterQuestion === 'All') return s.total_ai_score >= minAiScore;
+            return s.questions && s.questions[filterQuestion] && s.questions[filterQuestion].ai_score >= minAiScore;
+        })
         ?.filter(s => !searchQuery || 
             s.username.toLowerCase().includes(searchQuery.toLowerCase()) || 
             (s.user_slug && s.user_slug.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -123,17 +139,25 @@ function AISuspects() {
                         <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
                             <div className="flex items-center gap-3">
                                 <button
-                                    onClick={() => setFilterFlagged(!filterFlagged)}
-                                    className={clsx(
-                                        "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border",
-                                        filterFlagged
-                                            ? "bg-red-500/10 border-red-500/30 text-red-400"
-                                            : "bg-slate-800/50 border-white/10 text-gray-400 hover:border-white/20"
-                                    )}
+                                    onClick={() => fetchResults(true)}
+                                    title="Refresh Data"
+                                    className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-sm text-gray-400 hover:text-white hover:border-white/20 transition-all group"
                                 >
-                                    <Filter className="w-4 h-4" />
-                                    {filterFlagged ? 'Showing Flagged Only' : 'Show All Users'}
+                                    <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
                                 </button>
+                                <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 border border-white/10 rounded-lg">
+                                    <Filter className="w-4 h-4 text-gray-400" />
+                                    <span className="text-sm text-gray-400">Min Score:</span>
+                                    <input 
+                                        type="range" 
+                                        min="0" 
+                                        max="100" 
+                                        value={minAiScore}
+                                        onChange={(e) => setMinAiScore(Number(e.target.value))}
+                                        className="w-24 accent-amber-400"
+                                    />
+                                    <span className="text-sm font-bold text-amber-400 w-6 text-right">{minAiScore}</span>
+                                </div>
                                 <div className="relative">
                                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                     <input
@@ -144,6 +168,18 @@ function AISuspects() {
                                         className="pl-9 pr-4 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-400/50 transition-colors"
                                     />
                                 </div>
+                                {data?.questions_scanned && data.questions_scanned.length > 0 && (
+                                    <select
+                                        value={filterQuestion}
+                                        onChange={(e) => setFilterQuestion(e.target.value)}
+                                        className="bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-400 outline-none hover:border-white/20 transition-colors"
+                                    >
+                                        <option value="All">All Questions</option>
+                                        {data.questions_scanned.map(q => (
+                                            <option key={q} value={q}>{q}</option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-xs text-gray-500">Sort by:</span>

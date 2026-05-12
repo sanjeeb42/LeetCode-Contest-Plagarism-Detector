@@ -622,7 +622,7 @@ def _check_paste_for_ai_phrases(text):
     text_lower = text.lower()
     return any(phrase in text_lower for phrase in ai_phrases)
 
-def run_top500_scan(contest_slug, n=500, progress_callback=None):
+def run_top500_scan(contest_slug, n=500, progress_callback=None, questions_to_scan=None):
     """Orchestrates scanning the top N users' replays for AI indicators."""
     import json, time
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -635,9 +635,12 @@ def run_top500_scan(contest_slug, n=500, progress_callback=None):
     if not users:
         return {"error": "No users found. Run 'Fetch Submissions' first."}
     
-    # Get question slugs for Q3 and Q4
+    if questions_to_scan is None:
+        questions_to_scan = ["Q3", "Q4"]
+
+    # Get question slugs
     questions = {}
-    for q_id in ["Q3", "Q4"]:
+    for q_id in questions_to_scan:
         slug = get_title_slug(contest_slug, q_id)
         if slug:
             questions[q_id] = slug
