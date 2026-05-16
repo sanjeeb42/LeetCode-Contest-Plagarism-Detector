@@ -32,7 +32,12 @@ function AISuspects() {
         try {
             const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/top500_results?contest_slug=${slug}`);
             setData(resp.data);
-            localStorage.setItem(`top500_${slug}`, JSON.stringify(resp.data));
+            try {
+                localStorage.setItem(`top500_${slug}`, JSON.stringify(resp.data));
+            } catch (storageErr) {
+                console.warn('Could not save results to localStorage (might be too large), clearing stale cache:', storageErr);
+                localStorage.removeItem(`top500_${slug}`);
+            }
         } catch (err) {
             setError(err.response?.data?.error || 'No scan results found. Run the Top 500 scan first.');
         } finally {

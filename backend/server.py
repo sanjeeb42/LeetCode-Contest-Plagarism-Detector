@@ -103,6 +103,29 @@ def save_contests_route():
     save_contests(contests)
     return jsonify({"message": "Saved"})
 
+@app.route('/api/contest', methods=['DELETE'])
+def delete_contest():
+    slug = request.args.get('contest_slug')
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+
+    try:
+        import shutil
+        output_dir = os.path.join("resources", f"contest_report_{slug}")
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+
+        contests = load_contests()
+        filtered_contests = [c for c in contests if c.get("slug") != slug]
+        save_contests(filtered_contests)
+        
+        if slug in task_status:
+            del task_status[slug]
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/fetch', methods=['POST'])
 def trigger_fetch():
     data = request.json

@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import ControlPanel from '../components/ControlPanel';
 import ResultsDashboard from '../components/ResultsDashboard';
 import ReferenceManager from '../components/ReferenceManager';
-import { ShieldAlert, Activity, Cpu, ArrowLeft, Loader2, Bot, Download } from 'lucide-react';
+import { ShieldAlert, Activity, Cpu, ArrowLeft, Loader2, Bot, Download, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 function ContestDashboard() {
     const { slug } = useParams();
+    const navigate = useNavigate();
     const [threshold, setThreshold] = useState(50);
     const [clusters, setClusters] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -35,6 +36,22 @@ function ContestDashboard() {
 
     const handleExport = () => {
         window.location.href = `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/export?contest_slug=${slug}&threshold=${threshold}`;
+    };
+
+    const handleDelete = async () => {
+        const confirmed = window.confirm(`Are you sure you want to completely delete the dashboard for ${slug}? All fetched submissions, scan data, and AI analysis for this contest will be permanently erased from the server. You can re-fetch everything later if needed.`);
+        if (!confirmed) return;
+
+        setLoading(true);
+        try {
+            await axios.delete(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/contest?contest_slug=${slug}`);
+            localStorage.removeItem(`top500_${slug}`);
+            navigate('/');
+        } catch (error) {
+            console.error("Failed to delete dashboard:", error);
+            alert("Failed to delete dashboard. Please try again.");
+            setLoading(false);
+        }
     };
 
     return (
@@ -97,6 +114,14 @@ function ContestDashboard() {
                         >
                             <Download className="w-4 h-4 text-black" />
                             Export
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className="btn-secondary py-1.5 !border-red-500/30 !text-red-400 hover:!bg-red-500/10"
+                            title="Delete Contest Data"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            Delete
                         </button>
                     </div>
                 </div>
