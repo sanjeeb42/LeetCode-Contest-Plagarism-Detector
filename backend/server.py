@@ -259,6 +259,56 @@ def override_ai():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/manual_overrides', methods=['GET'])
+def get_manual_overrides():
+    slug = request.args.get('contest_slug')
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+    
+    overrides = plagiarism_detector.get_manual_overrides(slug)
+    return jsonify(overrides)
+
+@app.route('/api/export_ai_cheaters', methods=['GET'])
+def export_ai_cheaters():
+    slug = request.args.get('contest_slug')
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+        
+    try:
+        overrides = plagiarism_detector.get_manual_overrides(slug)
+        top500 = plagiarism_detector.load_top500_results(slug)
+        
+        import io
+        import csv
+        from flask import Response
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Username", "User Slug", "Rank", "AI Score", "Flagged As AI"])
+        
+        if top500 and "suspects" in top500:
+            exported = set()
+            for s in top500["suspects"]:
+                username = s["username"]
+                user_slug = s.get("user_slug", username)
+                if overrides.get(user_slug) is True or overrides.get(username) is True:
+                    writer.writerow([username, user_slug, s.get("rank", ""), s.get("total_ai_score", ""), "Yes"])
+                    exported.add(user_slug)
+                    exported.add(username)
+            
+            # Export any others in manual_overrides not in top500
+            for uid, is_ai in overrides.items():
+                if is_ai and uid not in exported:
+                    writer.writerow(["", uid, "", "", "Yes"])
+        else:
+            for uid, is_ai in overrides.items():
+                if is_ai:
+                    writer.writerow(["", uid, "", "", "Yes"])
+                    
+        return Response(output.getvalue(), mimetype="text/csv", headers={"Content-disposition": f"attachment; filename=ai_cheaters_{slug}.csv"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/submission_code', methods=['POST'])
 def get_submission_code():
     data = request.json

@@ -17,6 +17,7 @@ function AISuspects() {
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedUser, setExpandedUser] = useState(null);
     const [viewingReplayFor, setViewingReplayFor] = useState(null);
+    const [verifiedCheaters, setVerifiedCheaters] = useState({});
 
     const fetchResults = async (force = false) => {
         if (!force) {
@@ -32,6 +33,14 @@ function AISuspects() {
         try {
             const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/top500_results?contest_slug=${slug}`);
             setData(resp.data);
+            
+            try {
+                const overridesResp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/manual_overrides?contest_slug=${slug}`);
+                setVerifiedCheaters(overridesResp.data || {});
+            } catch (err) {
+                console.warn('Could not fetch manual overrides', err);
+            }
+
             try {
                 localStorage.setItem(`top500_${slug}`, JSON.stringify(resp.data));
             } catch (storageErr) {
@@ -48,6 +57,28 @@ function AISuspects() {
     useEffect(() => {
         fetchResults();
     }, [slug]);
+
+    const handleToggleVerified = async (e, username, currentStatus) => {
+        e.stopPropagation();
+        const newStatus = !currentStatus;
+        // Optimistic update
+        setVerifiedCheaters(prev => ({ ...prev, [username]: newStatus }));
+        try {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/override_ai`, {
+                contest_slug: slug,
+                username: username,
+                is_ai: newStatus
+            });
+        } catch (err) {
+            console.error("Failed to update verification status", err);
+            // Revert on failure
+            setVerifiedCheaters(prev => ({ ...prev, [username]: currentStatus }));
+        }
+    };
+
+    const handleExportAI = () => {
+        window.location.href = `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/export_ai_cheaters?contest_slug=${slug}`;
+    };
 
     const getScoreColor = (score) => {
         if (score >= 60) return 'text-red-400';
@@ -144,6 +175,14 @@ function AISuspects() {
                         <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
                             <div className="flex items-center gap-3">
                                 <button
+                                    onClick={handleExportAI}
+                                    title="Export AI Cheaters"
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm font-bold text-red-400 hover:bg-red-500/20 transition-all shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                                >
+                                    <AlertTriangle className="w-4 h-4" />
+                                    Export AI Cheaters
+                                </button>
+                                <button
                                     onClick={() => fetchResults(true)}
                                     title="Refresh Data"
                                     className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-sm text-gray-400 hover:text-white hover:border-white/20 transition-all group"
@@ -221,6 +260,27 @@ function AISuspects() {
                                                 className="p-5 flex items-center gap-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
                                                 onClick={() => setExpandedUser(isExpanded ? null : suspect.username)}
                                             >
+                                                {/* Verification Checkbox */}
+                                                <div 
+                                                    className="shrink-0 flex items-center justify-center p-1"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <label className="flex items-center cursor-pointer relative group/checkbox">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="peer sr-only"
+                                                            checked={!!verifiedCheaters[suspect.user_slug || suspect.username]}
+                                                            onChange={(e) => handleToggleVerified(e, suspect.user_slug || suspect.username, !!verifiedCheaters[suspect.user_slug || suspect.username])}
+                                                        />
+                                                        <div className="w-5 h-5 rounded border-2 border-gray-500 peer-checked:bg-red-500 peer-checked:border-red-500 flex items-center justify-center transition-colors">
+                                                            <CheckCircle className="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100" />
+                                                        </div>
+                                                        <span className="absolute left-1/2 -translate-x-1/2 -top-8 bg-slate-800 text-xs text-white px-2 py-1 rounded opacity-0 group-hover/checkbox:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                                                            Mark as AI Cheater
+                                                        </span>
+                                                    </label>
+                                                </div>
+
                                                 {/* Rank Badge */}
                                                 <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-white font-bold text-sm border border-white/5 shrink-0">
                                                     #{suspect.rank}

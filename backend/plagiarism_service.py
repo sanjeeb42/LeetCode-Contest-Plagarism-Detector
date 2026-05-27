@@ -432,6 +432,17 @@ def set_manual_override(contest_slug, username, is_ai):
             with open(cache_path, "w") as f: json.dump(_ai_cache, f)
         except: pass
 
+def get_manual_overrides(contest_slug):
+    import json, os
+    output_dir, _, _, _ = get_paths(contest_slug)
+    override_path = os.path.join(output_dir, "manual_overrides.json")
+    if os.path.exists(override_path):
+        try:
+            with open(override_path, "r") as f:
+                return json.load(f)
+        except: pass
+    return {}
+
 # --- TOP 500 AI SUSPECT SCANNER ---
 
 def get_top_n_users(contest_slug, n=500):
