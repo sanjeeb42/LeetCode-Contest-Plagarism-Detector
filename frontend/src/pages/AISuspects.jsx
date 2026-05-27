@@ -365,7 +365,7 @@ function AISuspects() {
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            setViewingReplayFor({ username: suspect.username, questionId: qId });
+                                                                            setViewingReplayFor({ username: suspect.username, userSlug: suspect.user_slug || suspect.username, questionId: qId });
                                                                         }}
                                                                         className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 text-xs font-medium hover:bg-sky-500/20 transition-colors"
                                                                     >
@@ -441,6 +441,7 @@ function AISuspects() {
                     contestSlug={slug}
                     questionId={viewingReplayFor.questionId}
                     username={viewingReplayFor.username}
+                    userSlug={viewingReplayFor.userSlug || viewingReplayFor.username}
                     onClose={() => setViewingReplayFor(null)}
                 />
             )}

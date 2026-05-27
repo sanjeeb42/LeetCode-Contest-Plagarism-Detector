@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { X, Play, Pause, SkipBack, SkipForward, Loader2, Clock, Code2, Clipboard, Terminal, CheckCircle, XCircle, Languages } from 'lucide-react';
+import { X, Play, Pause, SkipBack, SkipForward, Loader2, Clock, Code2, Clipboard, Terminal, CheckCircle, XCircle, Languages, ExternalLink } from 'lucide-react';
 import clsx from 'clsx';
 import Prism from 'prismjs';
 
@@ -12,7 +12,7 @@ import 'prismjs/components/prism-c';
 import 'prismjs/components/prism-cpp';
 import 'prismjs/components/prism-java';
 
-const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
+const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) => {
     const [frames, setFrames] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -219,8 +219,18 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                             <Code2 className="w-4 h-4 text-white" />
                         </div>
                         <div>
-                            <h3 className="text-white font-semibold text-sm leading-tight">
-                                {username} <span className="text-slate-500 font-normal">· {questionId}</span>
+                            <h3 className="text-white font-semibold text-sm leading-tight flex items-center gap-2">
+                                <span>{username}</span>
+                                <a
+                                    href={`https://leetcode.com/u/${userSlug || username}/`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-slate-500 hover:text-white transition-colors"
+                                    title="View LeetCode Profile"
+                                >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                                <span className="text-slate-500 font-normal">· {questionId}</span>
                             </h3>
                             <p className="text-slate-500 text-[11px]">Typing Replay · Code Construction Timeline</p>
                         </div>

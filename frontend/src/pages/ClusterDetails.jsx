@@ -247,6 +247,7 @@ function ClusterDetails() {
                     contestSlug={slug}
                     questionId={questionId}
                     username={viewingReplayFor}
+                    userSlug={cluster?.members?.find(m => m.username === viewingReplayFor)?.slug || viewingReplayFor}
                     onClose={() => setViewingReplayFor(null)}
                 />
             )}
