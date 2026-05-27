@@ -20,6 +20,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
     const [isPlaying, setIsPlaying] = useState(false);
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [showPostSubmit, setShowPostSubmit] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
@@ -56,19 +57,34 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
         return () => { cancelled = true; };
     }, [contestSlug, questionId, username]);
 
-    const startTime = frames.length > 0 ? frames[0].timestamp : 0;
-    const endTime = frames.length > 0 ? frames[frames.length - 1].timestamp : 0;
+    const filteredFrames = React.useMemo(() => {
+        if (frames.length === 0) return [];
+        if (showPostSubmit) return frames;
+
+        // Find last submit_code event
+        const subEvents = frames.filter(f => f.event === 'submit_code');
+        if (subEvents.length === 0) return frames;
+
+        const lastSub = subEvents[subEvents.length - 1];
+        const cutoff = lastSub.timestamp;
+
+        // Keep all frames up to and including the cutoff timestamp
+        return frames.filter(f => f.timestamp <= cutoff);
+    }, [frames, showPostSubmit]);
+
+    const startTime = filteredFrames.length > 0 ? filteredFrames[0].timestamp : 0;
+    const endTime = filteredFrames.length > 0 ? filteredFrames[filteredFrames.length - 1].timestamp : 0;
     const duration = endTime > startTime ? endTime - startTime : 0;
 
     const activeIndex = React.useMemo(() => {
-        if (frames.length === 0) return 0;
+        if (filteredFrames.length === 0) return 0;
         let low = 0;
-        let high = frames.length - 1;
+        let high = filteredFrames.length - 1;
         let best = 0;
 
         while (low <= high) {
             const mid = Math.floor((low + high) / 2);
-            if (frames[mid].timestamp - startTime <= currentTime) {
+            if (filteredFrames[mid].timestamp - startTime <= currentTime) {
                 best = mid;
                 low = mid + 1;
             } else {
@@ -76,15 +92,22 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
             }
         }
         return best;
-    }, [frames, currentTime, startTime]);
+    }, [filteredFrames, currentTime, startTime]);
 
     const timelineEvents = React.useMemo(() => {
-        return frames.filter(f => ['run_code', 'submit_code', 'switch_language', 'external_paste'].includes(f.event));
-    }, [frames]);
+        return filteredFrames.filter(f => ['run_code', 'submit_code', 'switch_language', 'external_paste'].includes(f.event));
+    }, [filteredFrames]);
+
+    // Clamp currentTime if duration shrinks
+    useEffect(() => {
+        if (currentTime > duration) {
+            setCurrentTime(duration);
+        }
+    }, [duration, currentTime]);
 
     useEffect(() => {
         let interval;
-        if (isPlaying && frames.length > 0) {
+        if (isPlaying && filteredFrames.length > 0) {
             const TICK_MS = 50;
             interval = setInterval(() => {
                 setCurrentTime(prev => {
@@ -98,7 +121,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
             }, TICK_MS);
         }
         return () => clearInterval(interval);
-    }, [isPlaying, frames, playbackSpeed, duration]);
+    }, [isPlaying, filteredFrames, playbackSpeed, duration]);
 
     const formatTime = (ms) => {
         const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
@@ -108,7 +131,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
     };
 
     const activePasteHighlight = React.useMemo(() => {
-        const frame = frames[activeIndex];
+        const frame = filteredFrames[activeIndex];
         if (!frame || frame.event !== 'external_paste' || !frame.text || !frame.code) return null;
 
         const code = frame.code;
@@ -122,13 +145,13 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
         const endLine = startLine + lineCount - 1;
 
         return { startLine, endLine };
-    }, [frames, activeIndex]);
+    }, [filteredFrames, activeIndex]);
 
     const highlightedCodeLines = React.useMemo(() => {
-        const code = frames[activeIndex]?.code || '';
+        const code = filteredFrames[activeIndex]?.code || '';
         if (!code) return [];
         const lines = code.split('\n');
-        const lang = frames[activeIndex]?.lang || 'python3';
+        const lang = filteredFrames[activeIndex]?.lang || 'python3';
         const cleanLang = lang === 'python3' ? 'python' : lang;
 
         let prismLang = Prism.languages[cleanLang];
@@ -146,7 +169,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
                 return line;
             }
         });
-    }, [frames, activeIndex]);
+    }, [filteredFrames, activeIndex]);
 
     const renderCode = () => {
         if (highlightedCodeLines.length === 0) {
@@ -344,16 +367,27 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
                                     {/* Playback Controls */}
                                     <div className="flex items-center justify-between select-none text-xs text-[#a0a0a0] font-sans">
                                         {/* Left: Play and Time */}
-                                        <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-4 flex-wrap">
                                             <button
                                                 onClick={() => setIsPlaying(!isPlaying)}
                                                 className="text-white hover:text-slate-200 transition-colors"
                                             >
                                                 {isPlaying ? <Pause className="w-5 h-5 fill-white stroke-none" /> : <Play className="w-5 h-5 fill-white stroke-none" />}
                                             </button>
-                                            <span className="font-mono text-sm text-[#8a8a8a]">
+                                            <span className="font-mono text-sm text-[#8a8a8a] mr-2">
                                                 <span className="text-white font-medium">{formatTime(currentTime)}</span> / {formatTime(duration)}
                                             </span>
+                                            {frames.some(f => f.event === 'submit_code') && (
+                                                <label className="flex items-center gap-1.5 cursor-pointer text-[#8a8a8a] hover:text-white transition-colors text-[10px] font-sans border border-[#3c3c3c] rounded px-1.5 py-0.5 bg-[#1d1d1d]/40">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={showPostSubmit} 
+                                                        onChange={(e) => setShowPostSubmit(e.target.checked)}
+                                                        className="rounded accent-white w-3 h-3 bg-transparent border-[#444444]" 
+                                                    />
+                                                    <span>Show Post-Submit</span>
+                                                </label>
+                                            )}
                                         </div>
 
                                         {/* Right: Cycle Speed, Settings, List */}
