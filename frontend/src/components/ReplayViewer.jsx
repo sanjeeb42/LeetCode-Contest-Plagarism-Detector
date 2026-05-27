@@ -2,6 +2,15 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { X, Play, Pause, SkipBack, SkipForward, Loader2, Clock, Code2, Clipboard, Terminal, CheckCircle, XCircle, Languages } from 'lucide-react';
 import clsx from 'clsx';
+import Prism from 'prismjs';
+
+// Prism CSS and languages
+import 'prismjs/themes/prism-tomorrow.css';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-clike';
+import 'prismjs/components/prism-c';
+import 'prismjs/components/prism-cpp';
+import 'prismjs/components/prism-java';
 
 const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
     const [frames, setFrames] = useState([]);
@@ -95,11 +104,6 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
         return () => clearInterval(interval);
     }, [isPlaying, frames, playbackSpeed, duration]);
 
-    const handleSliderChange = (e) => {
-        setCurrentTime(parseInt(e.target.value));
-        setIsPlaying(false);
-    };
-
     const formatTime = (ms) => {
         const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
         const m = Math.floor(totalSeconds / 60);
@@ -107,18 +111,74 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    // Render code with line numbers
-    const renderCode = (code) => {
-        if (!code) return <span className="text-slate-600 italic">No code yet...</span>;
+    // Calculate highlighted range for active paste
+    const activePasteHighlight = React.useMemo(() => {
+        const frame = frames[activeIndex];
+        if (!frame || frame.event !== 'external_paste' || !frame.text || !frame.code) return null;
+
+        const code = frame.code;
+        const text = frame.text;
+        const index = code.indexOf(text);
+        if (index === -1) return null;
+
+        const beforeText = code.slice(0, index);
+        const startLine = beforeText.split('\n').length - 1;
+        const lineCount = text.split('\n').length;
+        const endLine = startLine + lineCount - 1;
+
+        return { startLine, endLine };
+    }, [frames, activeIndex]);
+
+    // Highlight code using PrismJS line-by-line to avoid issues with tag splits
+    const highlightedCodeLines = React.useMemo(() => {
+        const code = frames[activeIndex]?.code || '';
+        if (!code) return [];
         const lines = code.split('\n');
-        return lines.map((line, i) => (
-            <div key={i} className="flex hover:bg-white/[0.02]">
-                <span className="select-none w-12 shrink-0 text-right pr-4 text-slate-600 text-[11px] leading-[22px] font-mono border-r border-white/5 mr-4">
-                    {i + 1}
-                </span>
-                <pre className="leading-[22px] text-[13px] m-0 p-0 font-mono whitespace-pre">{line || '\u00A0'}</pre>
-            </div>
-        ));
+        const lang = frames[activeIndex]?.lang || 'python3';
+        const cleanLang = lang === 'python3' ? 'python' : lang;
+
+        let prismLang = Prism.languages[cleanLang];
+        if (!prismLang) {
+            if (cleanLang === 'cpp' || cleanLang === 'c++') prismLang = Prism.languages.cpp;
+            else if (cleanLang === 'java') prismLang = Prism.languages.java;
+            else prismLang = Prism.languages.python;
+        }
+
+        return lines.map(line => {
+            if (!line) return '';
+            try {
+                return Prism.highlight(line, prismLang || Prism.languages.javascript, cleanLang);
+            } catch {
+                return line;
+            }
+        });
+    }, [frames, activeIndex]);
+
+    // Render code with line numbers and optional paste highlights
+    const renderCode = () => {
+        if (highlightedCodeLines.length === 0) {
+            return <span className="text-slate-600 italic">No code yet...</span>;
+        }
+        return highlightedCodeLines.map((lineHtml, i) => {
+            const isPasteHighlighted = activePasteHighlight && 
+                i >= activePasteHighlight.startLine && 
+                i <= activePasteHighlight.endLine;
+
+            return (
+                <div key={i} className={clsx(
+                    "flex transition-colors duration-150", 
+                    isPasteHighlighted ? "bg-red-500/10 border-l-2 border-red-500 pl-3 -ml-4" : "hover:bg-white/[0.02]"
+                )}>
+                    <span className="select-none w-12 shrink-0 text-right pr-4 text-slate-600 text-[11px] leading-[22px] font-mono border-r border-white/5 mr-4">
+                        {i + 1}
+                    </span>
+                    <pre 
+                        className="leading-[22px] text-[13px] m-0 p-0 font-mono whitespace-pre flex-1 text-slate-300 overflow-visible"
+                        dangerouslySetInnerHTML={{ __html: lineHtml || '\u00A0' }}
+                    />
+                </div>
+            );
+        });
     };
 
     // Get icon/color for event type
@@ -202,7 +262,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                             <>
                                 {/* Code Editor Area */}
                                 <div className="flex-1 overflow-auto bg-[#0d1117] p-4 custom-scrollbar font-mono text-slate-300">
-                                    {renderCode(currentCode)}
+                                    {renderCode()}
                                 </div>
 
                                 {/* Controls Bar */}
@@ -247,7 +307,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                                     </div>
 
                                     {/* Playback Controls */}
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 select-none">
                                         {/* Time */}
                                         <span className="text-xs font-mono text-slate-500 w-[90px]">
                                             <span className="text-white">{formatTime(currentTime)}</span> / {formatTime(duration)}
@@ -310,14 +370,14 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                     {/* Right: Timeline Sidebar */}
                     {!loading && !error && (
                         <div className="w-56 bg-[#161b22] flex flex-col overflow-hidden border-l border-white/[0.06]">
-                            <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-2">
+                            <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-2 select-none">
                                 <Clock className="w-3.5 h-3.5 text-slate-500" />
                                 <h4 className="text-slate-300 font-semibold text-xs uppercase tracking-wider">Events</h4>
                                 <span className="ml-auto text-[10px] text-slate-600 font-mono">{timelineEvents.length}</span>
                             </div>
                             <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
                                 {timelineEvents.length === 0 ? (
-                                    <div className="text-xs text-slate-600 text-center mt-8">No events detected</div>
+                                    <div className="text-xs text-slate-600 text-center mt-8 select-none">No events detected</div>
                                 ) : (
                                     timelineEvents.map((evt, idx) => {
                                         const style = getEventStyle(evt.event);
@@ -339,7 +399,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
                                                         : "border-transparent hover:bg-white/[0.03] hover:border-white/5"
                                                 )}
                                             >
-                                                <div className="flex items-center gap-2 mb-1.5">
+                                                <div className="flex items-center gap-2 mb-1.5 select-none">
                                                     <EventIcon className={clsx("w-3.5 h-3.5", isActive ? style.color : "text-slate-500 group-hover/evt:text-slate-400")} />
                                                     <span className={clsx("text-[11px] font-semibold", isActive ? "text-slate-200" : "text-slate-400")}>
                                                         {style.label}
@@ -351,18 +411,18 @@ const ReplayViewer = ({ contestSlug, questionId, username, onClose }) => {
 
                                                 {/* Meta */}
                                                 {evt.event === 'switch_language' && (
-                                                    <span className={clsx("inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold", style.bg, style.color)}>
+                                                    <span className={clsx("inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold select-none", style.bg, style.color)}>
                                                         {evt.lang}
                                                     </span>
                                                 )}
                                                 {evt.event === 'external_paste' && (
-                                                    <span className={clsx("inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold", style.bg, style.color)}>
+                                                    <span className={clsx("inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold select-none", style.bg, style.color)}>
                                                         {evt.chars} chars pasted
                                                     </span>
                                                 )}
                                                 {(evt.event === 'run_code' || evt.event === 'submit_code') && (
                                                     <span className={clsx(
-                                                        "inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold",
+                                                        "inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold select-none",
                                                         evt.status === 10 ? "bg-emerald-500/10 text-emerald-400" :
                                                             evt.status === 11 ? "bg-red-500/10 text-red-400" :
                                                                 "bg-slate-700 text-slate-400"

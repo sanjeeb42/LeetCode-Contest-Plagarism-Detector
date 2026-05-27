@@ -360,7 +360,7 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
                     code_state = code_state[:from_pos] + insert_text + code_state[to_pos:]
                     
                     if len(insert_text) > 50 and not event_data.get("isFromInside", False):
-                        frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text)})
+                        frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text), "text": insert_text})
             frames.append({"timestamp": timestamp, "code": code_state, "event": "flush"})
             
         elif event_type == "10":
@@ -376,7 +376,7 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
                             code_state = code_state[:pos] + insert_text + code_state[pos:]
                             
                             if len(insert_text) > 50:
-                                frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text)})
+                                frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text), "text": insert_text})
                         elif "l" in change and "d" in change:
                             pos = change["l"]
                             del_len = change["d"]
@@ -390,7 +390,7 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
                     code_state = code_state[:from_pos] + insert_text + code_state[to_pos:]
                     
                     if len(insert_text) > 50 and not event_data.get("isFromInside", False):
-                        frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text)})
+                        frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text), "text": insert_text})
             
             frames.append({"timestamp": timestamp, "code": code_state, "event": "typing"})
             
