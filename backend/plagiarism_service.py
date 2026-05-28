@@ -349,6 +349,8 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
             continue
             
         if event_type == "7":
+            if event_data.get("isFlush"):
+                code_state = ""
             if "c" in event_data:
                 code_state = event_data.get("c", "")
             else:
@@ -360,10 +362,13 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
                     code_state = code_state[:from_pos] + insert_text + code_state[to_pos:]
                     
                     if len(insert_text) > 50 and not event_data.get("isFromInside", False):
-                        frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text), "text": insert_text})
+                        has_comments = _check_paste_for_comments(insert_text)
+                        frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text), "text": insert_text, "has_comments": has_comments})
             frames.append({"timestamp": timestamp, "code": code_state, "event": "flush"})
             
         elif event_type == "10":
+            if event_data.get("isFlush"):
+                code_state = ""
             if "c" in event_data:
                 old_changes = event_data["c"]
                 if isinstance(old_changes, str):
@@ -376,7 +381,8 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
                             code_state = code_state[:pos] + insert_text + code_state[pos:]
                             
                             if len(insert_text) > 50:
-                                frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text), "text": insert_text})
+                                has_comments = _check_paste_for_comments(insert_text)
+                                frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text), "text": insert_text, "has_comments": has_comments})
                         elif "l" in change and "d" in change:
                             pos = change["l"]
                             del_len = change["d"]
@@ -390,7 +396,8 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
                     code_state = code_state[:from_pos] + insert_text + code_state[to_pos:]
                     
                     if len(insert_text) > 50 and not event_data.get("isFromInside", False):
-                        frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text), "text": insert_text})
+                        has_comments = _check_paste_for_comments(insert_text)
+                        frames.append({"timestamp": timestamp, "code": code_state, "event": "external_paste", "chars": len(insert_text), "text": insert_text, "has_comments": has_comments})
             
             frames.append({"timestamp": timestamp, "code": code_state, "event": "typing"})
             
@@ -417,7 +424,11 @@ def set_manual_override(contest_slug, username, is_ai):
         try:
             with open(override_path, "r") as f: overrides = json.load(f)
         except: pass
-    overrides[username] = is_ai
+    if is_ai is None:
+        if username in overrides:
+            del overrides[username]
+    else:
+        overrides[username] = is_ai
     with open(override_path, "w") as f:
         json.dump(overrides, f)
         
@@ -514,6 +525,8 @@ def analyze_replay_for_ai(contest_slug, username, title_slug):
             continue
         
         if event_type in ("7", "10"):
+            if event_data.get("isFlush"):
+                code_state = ""
             if event_type == "7" and "c" in event_data:
                 code_state = event_data.get("c", "")
             else:

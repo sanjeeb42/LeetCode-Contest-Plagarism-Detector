@@ -355,10 +355,12 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
                                                     key={i}
                                                     className={clsx(
                                                         "absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full border border-[#1a1a1a]",
-                                                        evt.event === 'external_paste' ? 'bg-[#ef4444]' : 'bg-[#1e88e5]'
+                                                        evt.event === 'external_paste'
+                                                            ? (evt.has_comments ? 'bg-[#ff3b30]' : 'bg-[#ef4444]')
+                                                            : 'bg-[#1e88e5]'
                                                     )}
                                                     style={{ left: `${evtPct}%` }}
-                                                    title={`${evt.event === 'external_paste' ? 'External Paste' : evt.event} at ${formatTime(evt.timestamp - startTime)}`}
+                                                    title={`${evt.event === 'external_paste' ? (evt.has_comments ? 'External Paste (AI Comments Detected)' : 'External Paste') : evt.event} at ${formatTime(evt.timestamp - startTime)}`}
                                                 />
                                             );
                                         })}
@@ -438,10 +440,8 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
                                                     setIsPlaying(false);
                                                 }}
                                                 className={clsx(
-                                                    "p-3 rounded-lg border text-xs cursor-pointer transition-all bg-[#262626]/40",
-                                                    isActive
-                                                        ? "bg-[#2d2d2d] border-[#444444]"
-                                                        : "border-transparent hover:bg-[#2d2d2d]/60"
+                                                    "p-3 rounded-lg border text-xs cursor-pointer transition-all",
+                                                    isActive ? "bg-[#2d2d2d] border-[#444444]" : "bg-[#262626]/40 border-transparent hover:bg-[#2d2d2d]/60"
                                                 )}
                                             >
                                                 <div className="flex justify-between items-center mb-2 font-sans select-none">
@@ -464,9 +464,19 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
                                                         </span>
                                                     )}
                                                     {evt.event === 'external_paste' && (
-                                                        <span className="px-2 py-0.5 rounded bg-[#3d2e2e] text-[#ea4a4a] border border-[#ea4a4a]/25 text-[10px] font-mono">
-                                                            {evt.chars} chars pasted
-                                                        </span>
+                                                        <div className="flex items-center gap-1.5 select-none">
+                                                            <span className="px-2 py-0.5 rounded bg-[#3d2e2e] text-[#ea4a4a] border border-[#ea4a4a]/25 text-[10px] font-mono">
+                                                                {evt.chars} chars pasted
+                                                            </span>
+                                                            {evt.has_comments && (
+                                                                <span 
+                                                                    className="text-xs cursor-help" 
+                                                                    title="Comments detected (possible AI template copy-paste)"
+                                                                >
+                                                                    ⚠️
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     )}
                                                     {(evt.event === 'run_code' || evt.event === 'submit_code') && (
                                                         <span className={clsx(

@@ -250,7 +250,7 @@ def override_ai():
     username = data.get('username')
     is_ai = data.get('is_ai')
 
-    if not all([contest_slug, username]) or is_ai is None:
+    if not all([contest_slug, username]) or 'is_ai' not in data:
         return jsonify({"error": "Missing required fields"}), 400
 
     try:

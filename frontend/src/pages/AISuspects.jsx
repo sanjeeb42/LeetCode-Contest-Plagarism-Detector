@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, ShieldAlert, Cpu, Loader2, AlertTriangle, CheckCircle, Eye, Play, ChevronDown, ChevronUp, ExternalLink, Filter, Search, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Cpu, Loader2, AlertTriangle, CheckCircle, Eye, Play, ChevronDown, ChevronUp, ExternalLink, Filter, Search, RefreshCw, Check, X } from 'lucide-react';
 import ReplayViewer from '../components/ReplayViewer';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -58,21 +58,36 @@ function AISuspects() {
         fetchResults();
     }, [slug]);
 
-    const handleToggleVerified = async (e, username, currentStatus) => {
+    const handleToggleVerified = async (e, username, currentStatus, newStatus) => {
         e.stopPropagation();
-        const newStatus = !currentStatus;
         // Optimistic update
-        setVerifiedCheaters(prev => ({ ...prev, [username]: newStatus }));
+        setVerifiedCheaters(prev => {
+            const updated = { ...prev };
+            if (newStatus === undefined) {
+                delete updated[username];
+            } else {
+                updated[username] = newStatus;
+            }
+            return updated;
+        });
         try {
             await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/override_ai`, {
                 contest_slug: slug,
                 username: username,
-                is_ai: newStatus
+                is_ai: newStatus === undefined ? null : newStatus
             });
         } catch (err) {
             console.error("Failed to update verification status", err);
             // Revert on failure
-            setVerifiedCheaters(prev => ({ ...prev, [username]: currentStatus }));
+            setVerifiedCheaters(prev => {
+                const reverted = { ...prev };
+                if (currentStatus === undefined) {
+                    delete reverted[username];
+                } else {
+                    reverted[username] = currentStatus;
+                }
+                return reverted;
+            });
         }
     };
 
@@ -263,22 +278,59 @@ function AISuspects() {
                                                 {/* Verification Checkbox */}
                                                 <div 
                                                     className="shrink-0 flex items-center justify-center p-1"
-                                                    onClick={(e) => e.stopPropagation()}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const userKey = suspect.user_slug || suspect.username;
+                                                        const currentStatus = verifiedCheaters[userKey];
+                                                        
+                                                        // Cycle status: undefined -> true (Cheated, Red) -> false (Not Cheating, Green) -> undefined (No Review, Gray)
+                                                        let newStatus;
+                                                        if (currentStatus === undefined) {
+                                                            newStatus = true;
+                                                        } else if (currentStatus === true) {
+                                                            newStatus = false;
+                                                        } else {
+                                                            newStatus = undefined;
+                                                        }
+                                                        
+                                                        handleToggleVerified(e, userKey, currentStatus, newStatus);
+                                                    }}
                                                 >
-                                                    <label className="flex items-center cursor-pointer relative group/checkbox">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            className="peer sr-only"
-                                                            checked={!!verifiedCheaters[suspect.user_slug || suspect.username]}
-                                                            onChange={(e) => handleToggleVerified(e, suspect.user_slug || suspect.username, !!verifiedCheaters[suspect.user_slug || suspect.username])}
-                                                        />
-                                                        <div className="w-5 h-5 rounded border-2 border-gray-500 peer-checked:bg-red-500 peer-checked:border-red-500 flex items-center justify-center transition-colors">
-                                                            <CheckCircle className="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100" />
+                                                    <div className="relative group/checkbox cursor-pointer select-none">
+                                                        {verifiedCheaters[suspect.user_slug || suspect.username] === true ? (
+                                                            // Red State: Cheated (Red border/bg with Check/X-mark style)
+                                                            <div className="w-5 h-5 rounded-md border border-red-500 bg-red-500/10 text-red-400 flex items-center justify-center shadow-[0_0_10px_rgba(239,68,68,0.2)] hover:bg-red-500/20 active:scale-90 transition-all duration-150">
+                                                                <X className="w-3 h-3 stroke-[3]" />
+                                                            </div>
+                                                        ) : verifiedCheaters[suspect.user_slug || suspect.username] === false ? (
+                                                            // Green State: Verified Human (Not Cheating) (Green border/bg with check)
+                                                            <div className="w-5 h-5 rounded-md border border-emerald-500 bg-emerald-500/10 text-emerald-400 flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.2)] hover:bg-emerald-500/20 active:scale-90 transition-all duration-150">
+                                                                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                                            </div>
+                                                        ) : (
+                                                            // Empty State: No manual review (clean empty outline box)
+                                                            <div className="w-5 h-5 rounded-md border-2 border-gray-600 hover:border-gray-400 active:scale-90 transition-all duration-150" />
+                                                        )}
+                                                        
+                                                        {/* Premium Custom Tooltip */}
+                                                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-slate-950/95 backdrop-blur-md text-[10px] font-sans font-medium text-gray-200 px-3 py-1.5 rounded-lg border border-white/10 opacity-0 group-hover/checkbox:opacity-100 transition-all duration-150 scale-95 group-hover/checkbox:scale-100 whitespace-nowrap pointer-events-none z-50 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.5)] flex flex-col items-center">
+                                                            <span className="font-semibold text-white">
+                                                                {verifiedCheaters[suspect.user_slug || suspect.username] === true 
+                                                                    ? "Manual Flag: Cheated" 
+                                                                    : verifiedCheaters[suspect.user_slug || suspect.username] === false 
+                                                                        ? "Manual Flag: Not Cheated" 
+                                                                        : "Unreviewed"}
+                                                            </span>
+                                                            <span className="text-[9px] text-gray-400 font-normal mt-0.5">
+                                                                {verifiedCheaters[suspect.user_slug || suspect.username] === true 
+                                                                    ? "Click to mark Safe" 
+                                                                    : verifiedCheaters[suspect.user_slug || suspect.username] === false 
+                                                                        ? "Click to clear review" 
+                                                                        : "Click to flag Cheater"}
+                                                            </span>
+                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-slate-950 border-r border-b border-white/10 rotate-45 -mt-[4px]" />
                                                         </div>
-                                                        <span className="absolute left-1/2 -translate-x-1/2 -top-8 bg-slate-800 text-xs text-white px-2 py-1 rounded opacity-0 group-hover/checkbox:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                                                            Mark as AI Cheater
-                                                        </span>
-                                                    </label>
+                                                    </div>
                                                 </div>
 
                                                 {/* Rank Badge */}
