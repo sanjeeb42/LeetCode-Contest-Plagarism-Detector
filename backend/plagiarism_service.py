@@ -257,7 +257,8 @@ def fetch_typing_replay(contest_slug, title_slug, username):
         "accept": "*/*",
         "content-type": "application/json",
         "x-csrftoken": fake_csrf,
-        "cookie": f"csrftoken={fake_csrf};"
+        "cookie": f"csrftoken={fake_csrf};",
+        "referer": "https://leetcode.com/"
     }
 
     body = {
@@ -287,6 +288,8 @@ def fetch_typing_replay(contest_slug, title_slug, username):
                         except Exception:
                             pass
                         return events
+            else:
+                print(f"Failed to fetch replay for {username} (status: {response.status_code}): {response.text[:200]}")
             # Retry after a short delay if no events returned
             if attempt < 2:
                 time.sleep(1)
@@ -354,7 +357,7 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
             if "c" in event_data:
                 code_state = event_data.get("c", "")
             else:
-                changes = event_data.get("change", {}).get("changes", [])
+                changes = event_data.get("changes") or event_data.get("change", {}).get("changes", [])
                 for change in changes:
                     from_pos = change.get("from", 0)
                     to_pos = change.get("to", from_pos)
@@ -388,7 +391,7 @@ def get_typing_replay_frames(contest_slug, title_slug, username):
                             del_len = change["d"]
                             code_state = code_state[:pos] + code_state[pos + del_len:]
             else:
-                changes = event_data.get("change", {}).get("changes", [])
+                changes = event_data.get("changes") or event_data.get("change", {}).get("changes", [])
                 for change in changes:
                     from_pos = change.get("from", 0)
                     to_pos = change.get("to", from_pos)
@@ -530,7 +533,7 @@ def analyze_replay_for_ai(contest_slug, username, title_slug):
             if event_type == "7" and "c" in event_data:
                 code_state = event_data.get("c", "")
             else:
-                changes = event_data.get("change", {}).get("changes", [])
+                changes = event_data.get("changes") or event_data.get("change", {}).get("changes", [])
                 for change in changes:
                     from_pos = change.get("from", 0)
                     to_pos = change.get("to", from_pos)
@@ -914,7 +917,7 @@ Code:
                 try:
                     event_data = json.loads(e.get("eventData", "{}"))
                     # New format
-                    changes = event_data.get("change", {}).get("changes", [])
+                    changes = event_data.get("changes") or event_data.get("change", {}).get("changes", [])
                     for change in changes:
                         insert_text = change.get("insert", "")
                         if "class Solution" not in insert_text and "class " not in insert_text:
