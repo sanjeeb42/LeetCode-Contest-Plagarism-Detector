@@ -14,6 +14,7 @@ import 'prismjs/components/prism-java';
 
 const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) => {
     const [frames, setFrames] = useState([]);
+    const [rating, setRating] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [currentTime, setCurrentTime] = useState(0);
@@ -29,7 +30,8 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
                 const resp = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/typing_replay`, {
                     contest_slug: contestSlug,
                     question_id: questionId,
-                    username: username
+                    username: username,
+                    user_slug: userSlug || username
                 });
 
                 if (cancelled) return;
@@ -41,6 +43,9 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
                     }));
                     parsedFrames.sort((a, b) => a.timestamp - b.timestamp);
                     setFrames(parsedFrames);
+                    if (resp.data.rating) {
+                        setRating(resp.data.rating);
+                    }
                     setCurrentTime(0);
                 } else {
                     setError("No replay events found for this user/question.");
@@ -284,10 +289,15 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
                             href={`https://leetcode.com/u/${userSlug || username}/`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[#a0a0a0] hover:text-white font-normal transition-colors flex items-center gap-1"
+                            className="text-[#a0a0a0] hover:text-white font-normal transition-colors flex items-center gap-1.5"
                             title="View LeetCode Profile"
                         >
                             <span>{username}</span>
+                            {rating && (
+                                <span className="px-1.5 py-0.5 bg-amber-500/15 border border-amber-500/30 text-[10px] font-mono font-bold text-[#FFA116] rounded-md" title="LeetCode Current Rating">
+                                    {rating}
+                                </span>
+                            )}
                             <ExternalLink className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
                         </a>
                     </div>

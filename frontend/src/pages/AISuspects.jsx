@@ -479,11 +479,16 @@ function AISuspects() {
                                                             href={`https://leetcode.com/u/${suspect.user_slug}`}
                                                             target="_blank"
                                                             rel="noreferrer"
-                                                            className="text-gray-500 hover:text-white p-1 hover:bg-white/5 rounded transition-all"
+                                                            className="text-gray-500 hover:text-white p-1 hover:bg-white/5 rounded transition-all mr-0.5"
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
                                                             <ExternalLink className="w-3 h-3" />
                                                         </a>
+                                                        {suspect.rating && suspect.rating !== "N/A" && suspect.rating !== "0" && (
+                                                            <span className="px-1.5 py-0.5 bg-amber-500/15 border border-amber-500/30 text-[10px] font-mono font-bold text-[#FFA116] rounded-md select-none" title="LeetCode Current Rating">
+                                                                {suspect.rating}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     {/* Reason Tags */}
                                                     <div className="flex flex-wrap gap-1.5 mt-1.5">

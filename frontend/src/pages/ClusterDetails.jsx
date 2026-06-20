@@ -153,15 +153,15 @@ function ClusterDetails() {
                                                         AI REFERENCE
                                                     </div>
                                                 ) : (
-                                                    <div>
-                                                        <a
-                                                            href={`https://leetcode.com/u/${member.slug || member.username}/`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="font-mono text-white hover:text-gray-300 transition-colors block mb-2 text-sm"
-                                                        >
-                                                            {member.username}
-                                                        </a>
+                                                     <div>
+                                                         <a
+                                                             href={`https://leetcode.com/u/${member.slug || member.username}/`}
+                                                             target="_blank"
+                                                             rel="noopener noreferrer"
+                                                             className="font-mono text-white hover:text-gray-300 transition-colors block mb-2 text-sm"
+                                                         >
+                                                             {member.username}
+                                                         </a>
                                                         <div className="flex flex-col gap-2 mt-3">
                                                             <button 
                                                                 disabled={overriding[member.username]}

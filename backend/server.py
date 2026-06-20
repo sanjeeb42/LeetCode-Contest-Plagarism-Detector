@@ -342,6 +342,7 @@ def typing_replay():
     slug = data.get("contest_slug")
     question_id = data.get("question_id")
     username = data.get("username")
+    user_slug = data.get("user_slug")
     
     if not all([slug, question_id, username]):
         return jsonify({"error": "Missing required fields"}), 400
@@ -351,7 +352,28 @@ def typing_replay():
         return jsonify({"error": "Could not determine title slug"}), 404
         
     frames = plagiarism_detector.get_typing_replay_frames(slug, title_slug, username)
-    return jsonify({"frames": frames})
+    
+    # Resolve username to user_slug if user_slug is not provided
+    if not user_slug:
+        try:
+            slugs_map = plagiarism_detector.load_user_slugs(slug)
+            user_slug = slugs_map.get(username, username)
+        except Exception:
+            user_slug = username
+            
+    # Fetch rating from cache only (avoid runtime network requests)
+    rating = None
+    try:
+        stats = rating_fetcher.get_rating(user_slug, cache_only=True)
+        if stats and "rating" in stats:
+            rating = stats["rating"]
+    except Exception as e:
+        print(f"Error fetching rating for {user_slug} from cache: {e}")
+        
+    return jsonify({
+        "frames": frames,
+        "rating": rating
+    })
 
 @app.route('/api/top500_scan', methods=['POST'])
 def trigger_top500_scan():

@@ -2,6 +2,8 @@ from curl_cffi import requests
 import io
 import concurrent.futures
 import time
+import os
+import json
 
 LEETCODE_URL = "https://leetcode.com/graphql"
 QUERY = """
@@ -20,7 +22,47 @@ query userProfile($username: String!) {
 }
 """
 
-def get_rating(username):
+CACHE_FILE = os.path.join("resources", "ratings_cache.json")
+_ratings_cache = None
+
+def load_cache():
+    global _ratings_cache
+    if _ratings_cache is not None:
+        return _ratings_cache
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                _ratings_cache = json.load(f)
+        except Exception as e:
+            print(f"Error loading ratings cache: {e}")
+            _ratings_cache = {}
+    else:
+        _ratings_cache = {}
+    return _ratings_cache
+
+def save_cache():
+    global _ratings_cache
+    if _ratings_cache is None:
+        return
+    try:
+        os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(_ratings_cache, f, indent=2)
+    except Exception as e:
+        print(f"Error saving ratings cache: {e}")
+
+def get_rating(username, cache_only=False):
+    if not username:
+        return None
+
+    username_lower = username.lower()
+    cache = load_cache()
+    if username_lower in cache:
+        return cache[username_lower]
+
+    if cache_only:
+        return None
+
     json_payload = {
         "query": QUERY,
         "variables": {"username": username}
@@ -63,6 +105,9 @@ def get_rating(username):
                      stats["total_solved"] = diff.get("count", 0)
                      break
                      
+        # Save to cache
+        cache[username_lower] = stats
+        save_cache()
         return stats
     except Exception as e:
         print(f"Error fetching stats for {username}: {e}")

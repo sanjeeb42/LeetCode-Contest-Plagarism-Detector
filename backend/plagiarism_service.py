@@ -683,10 +683,22 @@ def run_top500_scan(contest_slug, n=500, progress_callback=None, questions_to_sc
     
     for user in users:
         username = user["username"]
+        
+        # Fetch rating during scan
+        user_rating = "N/A"
+        try:
+            import rating_fetcher
+            stats = rating_fetcher.get_rating(user["user_slug"])
+            if stats and "rating" in stats:
+                user_rating = stats["rating"]
+        except Exception as e:
+            print(f"[!] Error fetching rating for {user['user_slug']} in scan: {e}")
+
         user_result = {
             "username": username,
             "user_slug": user["user_slug"],
             "rank": user["rank"],
+            "rating": user_rating,
             "questions": {},
             "total_ai_score": 0,
             "total_reasons": []
@@ -948,7 +960,7 @@ Code:
         except ValueError:
             current_rank = 999999
             
-        stats = rating_fetcher.get_rating(username)
+        stats = rating_fetcher.get_rating(username, cache_only=True)
         if stats:
             try:
                 hist_rating = int(stats.get("rating", "0"))
