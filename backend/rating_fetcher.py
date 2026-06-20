@@ -10,6 +10,7 @@ QUERY = """
 query userProfile($username: String!) {
   userContestRanking(username: $username) {
     rating
+    attendedContestsCount
   }
   matchedUser(username: $username) {
     submitStats {
@@ -58,7 +59,10 @@ def get_rating(username, cache_only=False):
     username_lower = username.lower()
     cache = load_cache()
     if username_lower in cache:
-        return cache[username_lower]
+        # If the cached entry doesn't have 'attended' and we are not in cache_only mode,
+        # trigger a refetch to populate the missing field.
+        if "attended" in cache[username_lower] or cache_only:
+            return cache[username_lower]
 
     if cache_only:
         return None
@@ -91,11 +95,14 @@ def get_rating(username, cache_only=False):
         time.sleep(0.2)
 
         data = response.json()
-        stats = { "rating": "0", "total_solved": 0 }
+        stats = { "rating": "0", "attended": 0, "total_solved": 0 }
         
         ranking = data.get("data", {}).get("userContestRanking")
-        if ranking and ranking.get("rating") is not None:
-             stats["rating"] = str(round(ranking.get("rating")))
+        if ranking:
+             if ranking.get("rating") is not None:
+                  stats["rating"] = str(round(ranking.get("rating")))
+             if ranking.get("attendedContestsCount") is not None:
+                  stats["attended"] = ranking.get("attendedContestsCount")
              
         matched = data.get("data", {}).get("matchedUser")
         if matched and matched.get("submitStats"):

@@ -50,14 +50,6 @@ function AISuspects() {
     const [copiedKey, setCopiedKey] = useState(null);
 
     const fetchResults = async (force = false) => {
-        if (!force) {
-            const cached = localStorage.getItem(`top500_${slug}`);
-            if (cached) {
-                setData(JSON.parse(cached));
-                setLoading(false);
-                return;
-            }
-        }
         setLoading(true);
         setError(null);
         try {
@@ -69,13 +61,6 @@ function AISuspects() {
                 setVerifiedCheaters(overridesResp.data || {});
             } catch (err) {
                 console.warn('Could not fetch manual overrides', err);
-            }
-
-            try {
-                localStorage.setItem(`top500_${slug}`, JSON.stringify(resp.data));
-            } catch (storageErr) {
-                console.warn('Could not save results to localStorage (might be too large), clearing stale cache:', storageErr);
-                localStorage.removeItem(`top500_${slug}`);
             }
         } catch (err) {
             setError(err.response?.data?.error || 'No scan results found. Run the Top 500 scan first.');
@@ -485,9 +470,16 @@ function AISuspects() {
                                                             <ExternalLink className="w-3 h-3" />
                                                         </a>
                                                         {suspect.rating && suspect.rating !== "N/A" && suspect.rating !== "0" && (
-                                                            <span className="px-1.5 py-0.5 bg-amber-500/15 border border-amber-500/30 text-[10px] font-mono font-bold text-[#FFA116] rounded-md select-none" title="LeetCode Current Rating">
-                                                                {suspect.rating}
-                                                            </span>
+                                                            <>
+                                                                <span className="px-1.5 py-0.5 bg-amber-500/15 border border-amber-500/30 text-[10px] font-mono font-bold text-[#FFA116] rounded-md select-none" title="LeetCode Current Rating">
+                                                                    {suspect.rating}
+                                                                </span>
+                                                                {suspect.attended !== undefined && suspect.attended !== null && suspect.attended !== 0 && (
+                                                                    <span className="px-1.5 py-0.5 bg-slate-500/15 border border-slate-500/30 text-[10px] font-mono font-bold text-slate-300 rounded-md select-none" title="Contests Attended">
+                                                                        {suspect.attended} contests
+                                                                    </span>
+                                                                )}
+                                                            </>
                                                         )}
                                                     </div>
                                                     {/* Reason Tags */}

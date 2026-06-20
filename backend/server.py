@@ -361,18 +361,23 @@ def typing_replay():
         except Exception:
             user_slug = username
             
-    # Fetch rating from cache only (avoid runtime network requests)
+    # Fetch stats from cache only (avoid runtime network requests)
     rating = None
+    attended = 0
     try:
         stats = rating_fetcher.get_rating(user_slug, cache_only=True)
-        if stats and "rating" in stats:
-            rating = stats["rating"]
+        if stats:
+            if "rating" in stats:
+                rating = stats["rating"]
+            if "attended" in stats:
+                attended = stats["attended"]
     except Exception as e:
-        print(f"Error fetching rating for {user_slug} from cache: {e}")
+        print(f"Error fetching stats for {user_slug} from cache: {e}")
         
     return jsonify({
         "frames": frames,
-        "rating": rating
+        "rating": rating,
+        "attended": attended
     })
 
 @app.route('/api/top500_scan', methods=['POST'])

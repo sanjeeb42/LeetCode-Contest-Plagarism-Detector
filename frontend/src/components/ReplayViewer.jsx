@@ -15,6 +15,7 @@ import 'prismjs/components/prism-java';
 const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) => {
     const [frames, setFrames] = useState([]);
     const [rating, setRating] = useState(null);
+    const [attended, setAttended] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [currentTime, setCurrentTime] = useState(0);
@@ -45,6 +46,9 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
                     setFrames(parsedFrames);
                     if (resp.data.rating) {
                         setRating(resp.data.rating);
+                    }
+                    if (resp.data.attended !== undefined) {
+                        setAttended(resp.data.attended);
                     }
                     setCurrentTime(0);
                 } else {
@@ -296,6 +300,11 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
                             {rating && (
                                 <span className="px-1.5 py-0.5 bg-amber-500/15 border border-amber-500/30 text-[10px] font-mono font-bold text-[#FFA116] rounded-md" title="LeetCode Current Rating">
                                     {rating}
+                                </span>
+                            )}
+                            {attended !== null && attended !== undefined && attended !== 0 && (
+                                <span className="px-1.5 py-0.5 bg-slate-500/15 border border-slate-500/30 text-[10px] font-mono font-bold text-slate-300 rounded-md" title="Contests Attended">
+                                    {attended} contests
                                 </span>
                             )}
                             <ExternalLink className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />

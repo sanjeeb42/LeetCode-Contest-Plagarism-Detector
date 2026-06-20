@@ -686,11 +686,15 @@ def run_top500_scan(contest_slug, n=500, progress_callback=None, questions_to_sc
         
         # Fetch rating during scan
         user_rating = "N/A"
+        attended_count = 0
         try:
             import rating_fetcher
             stats = rating_fetcher.get_rating(user["user_slug"])
-            if stats and "rating" in stats:
-                user_rating = stats["rating"]
+            if stats:
+                if "rating" in stats:
+                    user_rating = stats["rating"]
+                if "attended" in stats:
+                    attended_count = stats["attended"]
         except Exception as e:
             print(f"[!] Error fetching rating for {user['user_slug']} in scan: {e}")
 
@@ -699,6 +703,7 @@ def run_top500_scan(contest_slug, n=500, progress_callback=None, questions_to_sc
             "user_slug": user["user_slug"],
             "rank": user["rank"],
             "rating": user_rating,
+            "attended": attended_count,
             "questions": {},
             "total_ai_score": 0,
             "total_reasons": []
