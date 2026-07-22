@@ -4,7 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import ControlPanel from '../components/ControlPanel';
 import ResultsDashboard from '../components/ResultsDashboard';
 import ReferenceManager from '../components/ReferenceManager';
-import { ShieldAlert, Activity, Cpu, ArrowLeft, Loader2, Bot, Download, Trash2 } from 'lucide-react';
+import { ShieldAlert, Activity, Cpu, ArrowLeft, Loader2, Bot, Download, Trash2, Key } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 function ContestDashboard() {
@@ -90,6 +90,14 @@ function ContestDashboard() {
                         >
                             <ShieldAlert className="w-4 h-4" />
                             <span>AI Suspects</span>
+                        </Link>
+
+                        <Link
+                            to={`/contest/${slug}/keyword-suspects`}
+                            className="btn-secondary py-1.5 !border-red-500/30 !text-red-400 hover:!bg-red-500/10"
+                        >
+                            <Key className="w-4 h-4 text-red-400" />
+                            <span>Keyword Cheaters</span>
                         </Link>
 
                         <div className="hidden md:flex items-center gap-4">

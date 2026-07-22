@@ -16,7 +16,8 @@ CORS(app)  # Enable CORS for all routes
 # task_status = { "contest_slug": { "fetch": {...}, "analyze": {...} } }
 task_status = {}
 
-CONTESTS_FILE = "contests.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONTESTS_FILE = os.path.join(BASE_DIR, "contests.json")
 
 def load_contests():
     if not os.path.exists(CONTESTS_FILE):
@@ -44,10 +45,32 @@ def init_task_status(slug):
         task_status[slug] = {
             "fetch": {"status": "idle", "message": "", "progress": 0},
             "analyze": {"status": "idle", "message": "", "progress": 0},
-            "top500_scan": {"status": "idle", "message": "", "progress": 0}
+            "top500_scan": {"status": "idle", "message": "", "progress": 0},
+            "keyword_scan": {"status": "idle", "message": "", "progress": 0}
         }
-    elif "top500_scan" not in task_status[slug]:
-        task_status[slug]["top500_scan"] = {"status": "idle", "message": "", "progress": 0}
+    else:
+        if "top500_scan" not in task_status[slug]:
+            task_status[slug]["top500_scan"] = {"status": "idle", "message": "", "progress": 0}
+        if "keyword_scan" not in task_status[slug]:
+            task_status[slug]["keyword_scan"] = {"status": "idle", "message": "", "progress": 0}
+
+def run_keyword_scan_task(slug, keywords=None, limit=500, questions=None):
+    global task_status
+    try:
+        def update_progress(p):
+            task_status[slug]["keyword_scan"]["progress"] = p
+
+        result = plagiarism_detector.run_keyword_replay_scan(slug, keywords=keywords, limit=limit, questions_to_scan=questions, progress_callback=update_progress)
+        if "error" in result:
+            task_status[slug]["keyword_scan"] = {"status": "error", "message": result["error"]}
+        else:
+            task_status[slug]["keyword_scan"] = {
+                "status": "success",
+                "message": f"Keyword scan complete. {result.get('total_flagged', 0)} cheaters flagged.",
+                "progress": 100
+            }
+    except Exception as e:
+        task_status[slug]["keyword_scan"] = {"status": "error", "message": str(e)}
 
 def run_fetch_task(slug, limit=10):
     global task_status
@@ -521,6 +544,95 @@ def export_results():
         
         return Response(output.getvalue(), mimetype="text/csv", headers={"Content-disposition": f"attachment; filename=plagiarism_report_{slug}_{threshold}.csv"})
 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/contest_keywords', methods=['GET', 'POST'])
+def manage_contest_keywords():
+    if request.method == 'GET':
+        slug = request.args.get('contest_slug')
+        if not slug: return jsonify({"error": "Missing contest_slug"}), 400
+        keywords = plagiarism_detector.get_contest_keywords(slug)
+        return jsonify({"keywords": keywords})
+
+    if request.method == 'POST':
+        data = request.json
+        slug = data.get('contest_slug')
+        keywords = data.get('keywords', [])
+        if not slug: return jsonify({"error": "Missing contest_slug"}), 400
+        saved = plagiarism_detector.save_contest_keywords(slug, keywords)
+        return jsonify({"keywords": saved})
+
+@app.route('/api/keyword_scan', methods=['POST'])
+def trigger_keyword_scan():
+    data = request.json
+    slug = data.get("contest_slug")
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+
+    init_task_status(slug)
+
+    if task_status[slug]["keyword_scan"]["status"] == "running":
+        return jsonify({"error": "Keyword scan already in progress"}), 409
+
+    task_status[slug]["keyword_scan"] = {"status": "running", "message": "Starting keyword scan...", "progress": 0}
+
+    keywords = data.get("keywords")
+    limit = int(data.get("limit", 500))
+    questions = data.get("questions", ["Q1", "Q2", "Q3", "Q4"])
+
+    thread = threading.Thread(target=run_keyword_scan_task, args=(slug, keywords, limit, questions))
+    thread.start()
+    return jsonify({"message": f"Keyword scan started for {slug}"}), 202
+
+@app.route('/api/keyword_results', methods=['GET'])
+def get_keyword_results():
+    slug = request.args.get('contest_slug')
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+
+    results = plagiarism_detector.load_keyword_results(slug)
+    if results:
+        return jsonify(results)
+    else:
+        return jsonify({"error": "No keyword scan results found. Please configure keywords and run scan first."}), 404
+
+@app.route('/api/export_keyword_cheaters', methods=['GET'])
+def export_keyword_cheaters():
+    slug = request.args.get('contest_slug')
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+
+    try:
+        results = plagiarism_detector.load_keyword_results(slug)
+        if not results or "suspects" not in results:
+            return jsonify({"error": "No keyword cheaters found to export."}), 404
+
+        import io
+        import csv
+        from flask import Response
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Username", "User Slug", "Rank", "Rating", "Matched Keywords", "Reasons"])
+
+        for s in results["suspects"]:
+            kws = ", ".join(s.get("matched_keywords", []))
+            reasons = "; ".join(s.get("reasons", []))
+            writer.writerow([
+                s.get("username", ""),
+                s.get("user_slug", ""),
+                s.get("rank", ""),
+                s.get("rating", ""),
+                kws,
+                reasons
+            ])
+
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-disposition": f"attachment; filename=keyword_cheaters_{slug}.csv"}
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

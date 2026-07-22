@@ -23,7 +23,8 @@ query userProfile($username: String!) {
 }
 """
 
-CACHE_FILE = os.path.join("resources", "ratings_cache.json")
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CACHE_FILE = os.path.join(_BASE_DIR, "resources", "ratings_cache.json")
 _ratings_cache = None
 
 def load_cache():

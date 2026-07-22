@@ -5,6 +5,7 @@ import ContestDashboard from './pages/ContestDashboard';
 import ClusterDetails from './pages/ClusterDetails';
 import GenerateReport from './pages/GenerateReport';
 import AISuspects from './pages/AISuspects';
+import KeywordSuspects from './pages/KeywordSuspects';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="/contest/:slug" element={<ContestDashboard />} />
         <Route path="/contest/:slug/cluster/:questionId" element={<ClusterDetails />} />
         <Route path="/contest/:slug/ai-suspects" element={<AISuspects />} />
+        <Route path="/contest/:slug/keyword-suspects" element={<KeywordSuspects />} />
         <Route path="/generate-report" element={<GenerateReport />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

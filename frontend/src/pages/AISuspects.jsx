@@ -32,6 +32,24 @@ const detectLanguage = (code) => {
     return { name: 'C++', ext: 'cpp' }; // default LeetCode fallback
 };
 
+const cardVariants = {
+    hidden: { opacity: 0, y: 15 },
+    visible: (idx) => ({
+        opacity: 1,
+        y: 0,
+        transition: {
+            delay: Math.min(idx * 0.015, 0.3),
+            duration: 0.25
+        }
+    }),
+    exit: {
+        opacity: 0,
+        transition: {
+            duration: 0.15
+        }
+    }
+};
+
 function AISuspects() {
     const { slug } = useParams();
     const [data, setData] = useState(null);
@@ -356,22 +374,23 @@ function AISuspects() {
                                 {filteredSuspects.map((suspect, idx) => {
                                     const verdict = getVerdict(suspect.total_ai_score);
                                     const VerdictIcon = verdict.icon;
-                                    const isExpanded = expandedUser === suspect.username;
                                     const userKey = suspect.user_slug || suspect.username;
+                                    const isExpanded = expandedUser === userKey;
 
                                     return (
                                         <motion.div
-                                            key={suspect.username}
-                                            initial={{ opacity: 0, y: 15 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0 }}
-                                            transition={{ delay: idx * 0.015 }}
+                                            key={userKey}
+                                            variants={cardVariants}
+                                            custom={idx}
+                                            initial="hidden"
+                                            animate="visible"
+                                            exit="exit"
                                             className="glass-card rounded-2xl border border-white/5 hover:border-amber-500/20 hover:bg-[#1a1714]/40 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)] duration-300 transition-all overflow-hidden"
                                         >
                                             {/* User Header Row */}
                                             <div
                                                 className="p-5 flex flex-wrap md:flex-nowrap items-center gap-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
-                                                onClick={() => setExpandedUser(isExpanded ? null : suspect.username)}
+                                                onClick={() => setExpandedUser(isExpanded ? null : userKey)}
                                             >
                                                 {/* Verification Checkbox */}
                                                 <div 
@@ -631,7 +650,7 @@ function AISuspects() {
                                                                 {qData.final_code && (
                                                                     <div className="mt-2">
                                                                         {(() => {
-                                                                            const codeKey = `${suspect.username}-${qId}`;
+                                                                            const codeKey = `${userKey}-${qId}`;
                                                                             const isCodeExpanded = expandedCodes[codeKey];
                                                                             return (
                                                                                 <>

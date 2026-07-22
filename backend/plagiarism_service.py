@@ -8,12 +8,16 @@ from collections import defaultdict
 import s3_storage_service as s3
 
 # --- CONFIGURATION ---
-JPLAG_JAR = "jplag.jar"
+# Base directory is the folder containing this file (backend/), so resource
+# paths resolve correctly regardless of the working directory used to start
+# the server (e.g. `python backend/server.py` from the project root).
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+JPLAG_JAR = os.path.join(BASE_DIR, "jplag.jar")
 # Using a specific version of JPlag compatible with Java 8+
 JPLAG_URL = "https://github.com/jplag/jplag/releases/download/v2.12.1-SNAPSHOT/jplag-2.12.1-SNAPSHOT-jar-with-dependencies.jar"
 
 def get_paths(contest_slug):
-    output_dir = os.path.join("resources", f"contest_report_{contest_slug}")
+    output_dir = os.path.join(BASE_DIR, "resources", f"contest_report_{contest_slug}")
     csv_file = os.path.join(output_dir, "submission_matrix.csv")
     submissions_dir = os.path.join(output_dir, "submissions")
     jplag_results_dir = os.path.join(output_dir, "jplag_results")
@@ -777,6 +781,356 @@ def load_top500_results(contest_slug):
             return json.load(f)
     except Exception:
         return None
+
+# --- CONTEST KEYWORD CHEATING DETECTOR ---
+
+def get_contest_keywords(contest_slug):
+    """Retrieves saved contest keywords (e.g. 2-4 secret words) from resources/contest_report_{slug}/keywords.json."""
+    import json
+    output_dir, _, _, _ = get_paths(contest_slug)
+    kw_file = os.path.join(output_dir, "keywords.json")
+    if os.path.exists(kw_file):
+        try:
+            with open(kw_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def save_contest_keywords(contest_slug, keywords):
+    """Saves contest-specific keywords (array of strings) to resources/contest_report_{slug}/keywords.json."""
+    import json
+    output_dir, _, _, _ = get_paths(contest_slug)
+    os.makedirs(output_dir, exist_ok=True)
+    kw_file = os.path.join(output_dir, "keywords.json")
+    
+    clean_kws = list(dict.fromkeys([kw.strip() for kw in keywords if kw and kw.strip()]))
+    with open(kw_file, "w", encoding="utf-8") as f:
+        json.dump(clean_kws, f, indent=2)
+    return clean_kws
+
+def scan_replay_for_keywords(contest_slug, username, title_slug, keywords):
+    """
+    Scans a single user's typing replay events for occurrences of specified keywords or regex patterns.
+    Returns dict: { matches: [...], matched_keywords: [...], is_flagged: bool }
+    """
+    import json, re
+    if not keywords:
+        return {"matches": [], "matched_keywords": [], "is_flagged": False}
+
+    events = fetch_typing_replay(contest_slug, title_slug, username) or []
+    if not events:
+        return {"matches": [], "matched_keywords": [], "is_flagged": False}
+
+    raw_str = json.dumps(events)
+
+    # Compile regex patterns for keywords
+    patterns = []
+    for kw in keywords:
+        kw_str = str(kw).strip()
+        if not kw_str:
+            continue
+        try:
+            patterns.append((kw_str, re.compile(kw_str, re.IGNORECASE)))
+        except Exception:
+            patterns.append((kw_str, re.compile(re.escape(kw_str), re.IGNORECASE)))
+
+    if not patterns:
+        return {"matches": [], "matched_keywords": [], "is_flagged": False}
+
+    matches = []
+    found_keywords = set()
+
+    for event in events:
+        event_type = str(event.get("eventType", ""))
+        event_data_str = str(event.get("eventData", ""))
+        timestamp = event.get("timestamp", 0)
+
+        for kw, pat in patterns:
+            m = pat.search(event_data_str)
+            if m:
+                found_keywords.add(kw)
+                start = max(0, m.start() - 35)
+                end = min(len(event_data_str), m.end() + 55)
+                snippet = event_data_str[start:end].replace('\\n', ' ').replace('\n', ' ')
+
+                label = "replay_match"
+                if "insert" in event_data_str and len(event_data_str) > 100:
+                    label = "pasted_text"
+                elif event_type in ("7", "10"):
+                    label = "code_edit"
+
+                matches.append({
+                    "keyword": kw,
+                    "event_type": label,
+                    "timestamp": timestamp,
+                    "snippet": snippet
+                })
+
+    # Fallback to searching raw json string if per-event search didn't catch it
+    if not matches:
+        for kw, pat in patterns:
+            m = pat.search(raw_str)
+            if m:
+                found_keywords.add(kw)
+                start = max(0, m.start() - 35)
+                end = min(len(raw_str), m.end() + 55)
+                snippet = raw_str[start:end].replace('\\n', ' ').replace('\n', ' ')
+                matches.append({
+                    "keyword": kw,
+                    "event_type": "raw_replay",
+                    "timestamp": 0,
+                    "snippet": snippet
+                })
+
+    # Deduplicate matches by keyword + snippet
+    unique_matches = []
+    seen = set()
+    for m in matches:
+        key = (m["keyword"], m["snippet"])
+        if key not in seen:
+            seen.add(key)
+            unique_matches.append(m)
+
+    return {
+        "matches": unique_matches,
+        "matched_keywords": list(found_keywords),
+        "is_flagged": len(found_keywords) > 0
+    }
+
+def run_keyword_replay_scan(contest_slug, keywords=None, limit=500, questions_to_scan=None, progress_callback=None):
+    """
+    Scans replays for specified keywords/regex patterns across all cached replay files and Top N users.
+    Auto-flags any user with a regex match as Cheating (score 100).
+    Saves output to keyword_scan_results.json.
+    """
+    import json, time, re
+    from concurrent.futures import ThreadPoolExecutor
+
+    output_dir, _, _, _ = get_paths(contest_slug)
+    results_path = os.path.join(output_dir, "keyword_scan_results.json")
+    replays_dir = os.path.join(output_dir, "replays")
+
+    if not keywords:
+        keywords = get_contest_keywords(contest_slug)
+
+    if not keywords:
+        return {"error": "No keywords specified for this contest. Please add 2-4 keywords first."}
+
+    # Save active keywords
+    save_contest_keywords(contest_slug, keywords)
+
+    # Compile regex patterns
+    patterns = []
+    for kw in keywords:
+        kw_str = str(kw).strip()
+        if not kw_str:
+            continue
+        try:
+            patterns.append((kw_str, re.compile(kw_str, re.IGNORECASE)))
+        except Exception:
+            patterns.append((kw_str, re.compile(re.escape(kw_str), re.IGNORECASE)))
+
+    if not patterns:
+        return {"error": "No valid keywords or regex patterns provided."}
+
+    # Build question mapping (title_slug -> Q1/Q2/Q3/Q4)
+    raw_path = os.path.join(output_dir, "raw_data.json")
+    q_map = {}
+    user_map = {}
+    if os.path.exists(raw_path):
+        try:
+            with open(raw_path, "r", encoding="utf-8") as f:
+                raw_data = json.load(f)
+
+            for i, q in enumerate(raw_data.get("questions", [])):
+                slug = q.get("title_slug")
+                if slug:
+                    q_map[slug] = f"Q{i+1}"
+
+            for rank_entry in raw_data.get("total_rank", []):
+                u = rank_entry.get("username")
+                us = rank_entry.get("user_slug") or u
+                info = {
+                    "username": u,
+                    "user_slug": us,
+                    "rank": rank_entry.get("rank", 99999)
+                }
+                user_map[u] = info
+                user_map[us] = info
+        except Exception as e:
+            print(f"[!] Warning reading raw_data.json: {e}")
+
+    # Fallback question mapping if empty
+    if not q_map and questions_to_scan:
+        for q_id in questions_to_scan:
+            slug = get_title_slug(contest_slug, q_id)
+            if slug:
+                q_map[slug] = q_id
+
+    print(f"[*] Starting Fast Regex Replay Scan for '{contest_slug}' with keywords: {keywords}")
+
+    scanned_replays_count = 0
+    replay_results = []
+
+    if os.path.exists(replays_dir):
+        files = [f for f in os.listdir(replays_dir) if f.endswith(".json")]
+        scanned_replays_count = len(files)
+
+        def process_replay_file(fname):
+            fpath = os.path.join(replays_dir, fname)
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+            except Exception:
+                return None
+
+            matched_kws = set()
+            matches_meta = []
+
+            events = []
+            try:
+                events = json.loads(content)
+            except Exception:
+                pass
+
+            for kw, pat in patterns:
+                if events:
+                    for evt in events:
+                        evt_str = str(evt.get("eventData", ""))
+                        m = pat.search(evt_str)
+                        if m:
+                            matched_kws.add(kw)
+                            start = max(0, m.start() - 35)
+                            end = min(len(evt_str), m.end() + 55)
+                            matches_meta.append({
+                                "keyword": kw,
+                                "event_type": "replay_match",
+                                "timestamp": evt.get("timestamp", 0),
+                                "snippet": evt_str[start:end].replace('\\n', ' ').replace('\n', ' ')
+                            })
+                if kw not in matched_kws:
+                    m = pat.search(content)
+                    if m:
+                        matched_kws.add(kw)
+                        start = max(0, m.start() - 35)
+                        end = min(len(content), m.end() + 55)
+                        matches_meta.append({
+                            "keyword": kw,
+                            "event_type": "raw_replay",
+                            "timestamp": 0,
+                            "snippet": content[start:end].replace('\\n', ' ').replace('\n', ' ')
+                        })
+
+            if not matched_kws:
+                return None
+
+            base_name = fname[:-5]
+            matched_user = base_name
+            matched_qid = "Q1"
+
+            for t_slug, q_id in q_map.items():
+                safe_t_slug = t_slug.replace("/", "_").replace("\\", "_")
+                if base_name.endswith("_" + safe_t_slug):
+                    matched_user = base_name[:-len("_" + safe_t_slug)]
+                    matched_qid = q_id
+                    break
+
+            return {
+                "filename": fname,
+                "user_part": matched_user,
+                "q_id": matched_qid,
+                "matched_keywords": list(matched_kws),
+                "matches": matches_meta
+            }
+
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            batch_res = list(executor.map(process_replay_file, files))
+        replay_results = [r for r in batch_res if r]
+
+    # Group matches by user
+    suspects_by_user = {}
+    for r in replay_results:
+        u_key = r["user_part"]
+        u_info = user_map.get(u_key, {"username": u_key, "user_slug": u_key, "rank": 99999})
+        uname = u_info["username"]
+
+        if uname not in suspects_by_user:
+            user_rating = "N/A"
+            attended_count = 0
+            try:
+                import rating_fetcher
+                stats = rating_fetcher.get_rating(u_info["user_slug"], cache_only=True)
+                if stats:
+                    if "rating" in stats: user_rating = stats["rating"]
+                    if "attended" in stats: attended_count = stats["attended"]
+            except Exception:
+                pass
+
+            suspects_by_user[uname] = {
+                "username": uname,
+                "user_slug": u_info["user_slug"],
+                "rank": u_info["rank"],
+                "rating": user_rating,
+                "attended": attended_count,
+                "matched_keywords": set(),
+                "questions": {},
+                "ai_score": 100,
+                "is_cheater": True,
+                "reasons": []
+            }
+
+        suspects_by_user[uname]["matched_keywords"].update(r["matched_keywords"])
+        suspects_by_user[uname]["questions"][r["q_id"]] = {
+            "matches": r["matches"],
+            "matched_keywords": r["matched_keywords"]
+        }
+
+    # Format flagged suspects list & auto-flag in manual overrides
+    flagged_suspects = []
+    for uname, suspect_data in suspects_by_user.items():
+        kws_list = list(suspect_data["matched_keywords"])
+        suspect_data["matched_keywords"] = kws_list
+        suspect_data["reasons"] = [f"Contest Keyword Match: {', '.join(kws_list)}"]
+
+        # Auto-flag as Cheater in manual overrides!
+        set_manual_override(contest_slug, uname, True)
+        flagged_suspects.append(suspect_data)
+
+    # Sort suspects by rank
+    flagged_suspects.sort(key=lambda s: s["rank"])
+
+    output = {
+        "contest_slug": contest_slug,
+        "keywords": keywords,
+        "total_scanned": scanned_replays_count,
+        "total_flagged": len(flagged_suspects),
+        "questions_scanned": list(q_map.values()) if q_map else ["Q1", "Q2", "Q3", "Q4"],
+        "suspects": flagged_suspects
+    }
+
+    with open(results_path, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2)
+
+    if progress_callback:
+        progress_callback(100)
+
+    print(f"[✓] Regex Keyword Scan complete. {len(flagged_suspects)} cheaters flagged for keywords: {keywords}")
+    return output
+
+def load_keyword_results(contest_slug):
+    """Loads cached keyword scan results."""
+    import json
+    output_dir, _, _, _ = get_paths(contest_slug)
+    results_path = os.path.join(output_dir, "keyword_scan_results.json")
+    if not os.path.exists(results_path):
+        return None
+    try:
+        with open(results_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
 
 def analyze_ai_likelihood(code, language="text", username=None, contest_slug=None, title_slug=None):
     """

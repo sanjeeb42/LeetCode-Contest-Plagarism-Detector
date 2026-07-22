@@ -93,5 +93,29 @@
     {
         "name": "Weekly Contest 503",
         "slug": "weekly-contest-503"
+    },
+    {
+        "name": "Biweekly Contest 185",
+        "slug": "biweekly-contest-185"
+    },
+    {
+        "name": "Weekly Contest 507",
+        "slug": "weekly-contest-507"
+    },
+    {
+        "name": "Weekly Contest 508",
+        "slug": "weekly-contest-508"
+    },
+    {
+        "name": "Weekly Contest 509",
+        "slug": "weekly-contest-509"
+    },
+    {
+        "name": "Weekly Contest 510",
+        "slug": "weekly-contest-510"
+    },
+    {
+        "name": "Weekly Contest 511",
+        "slug": "weekly-contest-511"
     }
 ]

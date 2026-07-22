@@ -15,9 +15,10 @@ warnings.filterwarnings("ignore")
 # --- CONFIGURATION ---
 LIMIT_USERS = 100
 MAX_WORKERS = 5
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_paths(contest_slug):
-    output_dir = os.path.join("resources", f"contest_report_{contest_slug}")
+    output_dir = os.path.join(_BASE_DIR, "resources", f"contest_report_{contest_slug}")
     raw_json_file = os.path.join(output_dir, "raw_data.json")
     report_file = os.path.join(output_dir, "submission_matrix.csv")
     meta_file = os.path.join(output_dir, "fetch_meta.json")
