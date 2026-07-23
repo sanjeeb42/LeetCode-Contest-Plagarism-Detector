@@ -60,77 +60,96 @@ function ContestDashboard() {
             <div className="glow-cyan top-[-100px] left-[-100px]" />
             <div className="glow-blue bottom-[-100px] right-[-100px]" />
 
-            <header className="sticky top-0 z-50 glass-panel rounded-none border-t-0 border-x-0 border-b-white/10 shadow-none">
-                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Link to="/" className="p-2 hover:bg-white/10 rounded-md transition-colors text-gray-400 hover:text-white">
-                            <ArrowLeft className="w-5 h-5" />
+            <header className="sticky top-0 z-50 bg-[#0f0e0d]/80 backdrop-blur-xl border-b border-white/10 shadow-2xl select-none">
+                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
+                    {/* Brand & Back Button */}
+                    <div className="flex items-center gap-4 shrink-0">
+                        <Link 
+                            to="/" 
+                            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-200 text-gray-400 hover:text-white active:scale-95"
+                            title="Back to Home"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
                         </Link>
                         <div className="flex items-center gap-3">
-                            <ShieldAlert className="w-6 h-6 text-white" />
+                            <div className="relative">
+                                <ShieldAlert className="w-7 h-7 text-amber-500 drop-shadow-[0_0_12px_rgba(245,158,11,0.4)]" />
+                            </div>
                             <div>
-                                <h1 className="text-lg font-semibold text-white tracking-tight">LeetCode <span className="text-gray-400 font-normal">Detective</span></h1>
+                                <h1 className="text-base font-bold text-white tracking-tight leading-none">
+                                    LeetCode <span className="text-amber-500 font-normal">Detective</span>
+                                </h1>
+                                <span className="text-[10px] text-gray-500 font-mono mt-1 block">Contest: {slug}</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-6">
-                        {/* Reference Manager Button */}
-                        <button
-                            onClick={() => setShowReferenceManager(true)}
-                            className="btn-secondary py-1.5"
-                        >
-                            <Bot className="w-4 h-4" />
-                            <span>AI References</span>
-                        </button>
+                    {/* Navigation Pills & Controls */}
+                    <div className="flex items-center gap-3 md:gap-4 overflow-x-auto no-scrollbar py-1">
+                        {/* Segmented Feature Nav Group */}
+                        <div className="flex items-center gap-1.5 p-1 bg-black/60 border border-white/10 rounded-xl backdrop-blur-md shrink-0">
+                            <button
+                                onClick={() => setShowReferenceManager(true)}
+                                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-amber-300 hover:text-white hover:bg-white/10 transition-all duration-200 inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                            >
+                                <Bot className="w-3.5 h-3.5 text-amber-400" />
+                                <span>AI References</span>
+                            </button>
 
-                        <Link
-                            to={`/contest/${slug}/ai-suspects`}
-                            className="btn-secondary py-1.5 !border-amber-500/30 !text-amber-400 hover:!bg-amber-500/10"
-                        >
-                            <ShieldAlert className="w-4 h-4" />
-                            <span>AI Suspects</span>
-                        </Link>
+                            <Link
+                                to={`/contest/${slug}/ai-suspects`}
+                                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all duration-200 inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                            >
+                                <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                                <span>AI Suspects</span>
+                            </Link>
 
-                        <Link
-                            to={`/contest/${slug}/keyword-suspects`}
-                            className="btn-secondary py-1.5 !border-red-500/30 !text-red-400 hover:!bg-red-500/10"
-                        >
-                            <Key className="w-4 h-4 text-red-400" />
-                            <span>Keyword Cheaters</span>
-                        </Link>
-
-                        <div className="hidden md:flex items-center gap-4">
-                            <div className="flex flex-col items-end">
-                                <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">Confidence</span>
-                                <span className="text-lg font-bold font-mono text-white">{threshold}%</span>
-                            </div>
-                            <div className="w-48 flex items-center">
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={threshold}
-                                    onChange={(e) => setThreshold(e.target.value)}
-                                    className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-200 transition-colors"
-                                />
-                            </div>
+                            <Link
+                                to={`/contest/${slug}/keyword-suspects`}
+                                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition-all duration-200 inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 shadow-[0_0_12px_rgba(239,68,68,0.15)]"
+                            >
+                                <Key className="w-3.5 h-3.5 text-red-400" />
+                                <span>Keyword Cheaters</span>
+                            </Link>
                         </div>
-                        <button
-                            onClick={handleExport}
-                            className="btn-primary py-1.5"
-                        >
-                            <Download className="w-4 h-4 text-black" />
-                            Export
-                        </button>
-                        <button
-                            onClick={handleDelete}
-                            className="btn-secondary py-1.5 !border-red-500/30 !text-red-400 hover:!bg-red-500/10"
-                            title="Delete Contest Data"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            Delete
-                        </button>
+
+                        {/* Confidence Slider Control */}
+                        <div className="hidden lg:flex items-center gap-3 px-3 py-1.5 bg-black/40 border border-white/10 rounded-xl shrink-0">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-gray-400 font-mono uppercase tracking-wider font-bold">Confidence</span>
+                                <span className="px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-mono font-bold rounded">
+                                    {threshold}%
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={threshold}
+                                onChange={(e) => setThreshold(e.target.value)}
+                                className="w-28 h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-amber-500 hover:accent-amber-400 transition-colors"
+                            />
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button
+                                onClick={handleExport}
+                                className="px-4 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs rounded-xl shadow-[0_0_20px_rgba(255,161,22,0.3)] inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 transition-all duration-200"
+                            >
+                                <Download className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                                <span>Export</span>
+                            </button>
+
+                            <button
+                                onClick={handleDelete}
+                                className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 transition-all duration-200"
+                                title="Delete Contest Data"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </header>

@@ -86,11 +86,11 @@ body::before {
 
 /* Premium Buttons - Bringing in the signature Yellow */
 .btn-primary {
-  @apply px-6 py-3 bg-[#FFA116] text-[#1a1100] font-bold rounded-lg hover:bg-[#ffb03a] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 inline-flex items-center justify-center gap-2 text-sm shadow-[0_0_30px_rgba(255,161,22,0.3)];
+  @apply px-6 py-3 bg-[#FFA116] text-[#1a1100] font-bold rounded-lg hover:bg-[#ffb03a] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 inline-flex items-center justify-center gap-2 text-sm whitespace-nowrap shadow-[0_0_30px_rgba(255,161,22,0.3)];
 }
 
 .btn-secondary {
-  @apply px-5 py-2.5 bg-transparent border border-amber-500/30 text-amber-500 font-medium rounded-lg hover:bg-amber-500/10 hover:text-amber-400 transition-all duration-200 inline-flex items-center justify-center gap-2 text-sm shadow-[0_0_20px_rgba(255,161,22,0.05)];
+  @apply px-5 py-2.5 bg-transparent border border-amber-500/30 text-amber-500 font-medium rounded-lg hover:bg-amber-500/10 hover:text-amber-400 transition-all duration-200 inline-flex items-center justify-center gap-2 text-sm whitespace-nowrap shadow-[0_0_20px_rgba(255,161,22,0.05)];
 }
 
 .text-glow {

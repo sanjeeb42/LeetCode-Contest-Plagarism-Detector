@@ -4,7 +4,7 @@ import axios from 'axios';
 import { 
     ArrowLeft, ShieldAlert, Cpu, Loader2, AlertTriangle, CheckCircle, 
     Eye, Play, ChevronDown, ChevronUp, ExternalLink, Filter, Search, 
-    RefreshCw, Check, X, Terminal, Copy, Code2, Users, ChevronRight 
+    RefreshCw, Check, X, Terminal, Copy, Code2, Users, ChevronRight, Key, Bot 
 } from 'lucide-react';
 import ReplayViewer from '../components/ReplayViewer';
 import { motion, AnimatePresence } from 'framer-motion';
