@@ -121,5 +121,13 @@
     {
         "name": "Biweekly Contest 187",
         "slug": "biweekly-contest-187"
+    },
+    {
+        "name": "Weekly Contest 512",
+        "slug": "weekly-contest-512"
+    },
+    {
+        "name": "Weekly Contest 513",
+        "slug": "weekly-contest-513"
     }
 ]

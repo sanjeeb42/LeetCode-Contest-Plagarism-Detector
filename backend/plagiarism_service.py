@@ -463,8 +463,8 @@ def get_manual_overrides(contest_slug):
 
 # --- TOP 500 AI SUSPECT SCANNER ---
 
-def get_top_n_users(contest_slug, n=500):
-    """Reads the already-fetched raw_data.json and returns the top N users sorted by rank."""
+def get_top_users_range(contest_slug, start_rank=1, end_rank=500):
+    """Reads the already-fetched raw_data.json and returns users within the given rank range."""
     import json
     output_dir, _, _, _ = get_paths(contest_slug)
     raw_json_file = os.path.join(output_dir, "raw_data.json")
@@ -500,9 +500,11 @@ def get_top_n_users(contest_slug, n=500):
             "rank": rank_entry.get("rank", 99999)
         })
     
-    # Sort by rank and return top N
+    # Sort by rank and return the requested range
     users.sort(key=lambda u: u["rank"])
-    return users[:n]
+    # Convert 1-based start_rank to 0-based index
+    start_idx = max(0, start_rank - 1)
+    return users[start_idx:end_rank]
 
 def analyze_replay_for_ai(contest_slug, username, title_slug):
     """Analyzes a single user's typing replay for AI indicators in their pasted code."""
@@ -653,16 +655,74 @@ def _check_paste_for_ai_phrases(text):
     text_lower = text.lower()
     return any(phrase in text_lower for phrase in ai_phrases)
 
-def run_top500_scan(contest_slug, n=500, progress_callback=None, questions_to_scan=None):
-    """Orchestrates scanning the top N users' replays for AI indicators."""
-    import json, time
+def _scan_user_worker(user, contest_slug, questions):
+    username = user["username"]
+    
+    # Fetch rating during scan
+    user_rating = "N/A"
+    attended_count = 0
+    try:
+        import rating_fetcher
+        stats = rating_fetcher.get_rating(user["user_slug"])
+        if stats:
+            if "rating" in stats:
+                user_rating = stats["rating"]
+            if "attended" in stats:
+                attended_count = stats["attended"]
+    except Exception as e:
+        print(f"[!] Error fetching rating for {user['user_slug']} in scan: {e}")
+
+    user_result = {
+        "username": username,
+        "user_slug": user["user_slug"],
+        "rank": user["rank"],
+        "rating": user_rating,
+        "attended": attended_count,
+        "questions": {},
+        "total_ai_score": 0,
+        "total_reasons": []
+    }
+    
+    max_score = 0
+    all_reasons = []
+    
+    for q_id, title_slug in questions.items():
+        try:
+            analysis = analyze_replay_for_ai(contest_slug, username, title_slug)
+            user_result["questions"][q_id] = {
+                "ai_score": analysis["ai_score"],
+                "reasons": analysis["reasons"],
+                "paste_events": analysis["paste_events"],
+                "paste_ratio": analysis["paste_ratio"],
+                "final_code": analysis["final_code"]
+            }
+            
+            if analysis["ai_score"] > max_score:
+                max_score = analysis["ai_score"]
+            all_reasons.extend(analysis["reasons"])
+            
+        except Exception as e:
+            print(f"[!] Error scanning {username} for {q_id}: {e}")
+            user_result["questions"][q_id] = {
+                "ai_score": 0, "reasons": ["Scan error"], 
+                "paste_events": [], "paste_ratio": 0, "final_code": ""
+            }
+        
+    user_result["total_ai_score"] = max_score
+    user_result["total_reasons"] = list(set(all_reasons))
+    
+    return user_result
+
+def run_top500_scan(contest_slug, n=500, start_rank=1, progress_callback=None, questions_to_scan=None):
+    """Orchestrates scanning the top N users' replays for AI indicators using multithreading."""
+    import json
     from concurrent.futures import ThreadPoolExecutor, as_completed
     
     output_dir, _, _, _ = get_paths(contest_slug)
     results_path = os.path.join(output_dir, "top500_ai_results.json")
     
-    # Get top N users
-    users = get_top_n_users(contest_slug, n=n)
+    # Get top N users within range
+    users = get_top_users_range(contest_slug, start_rank=start_rank, end_rank=n)
     if not users:
         return {"error": "No users found. Run 'Fetch Submissions' first."}
     
@@ -679,75 +739,26 @@ def run_top500_scan(contest_slug, n=500, progress_callback=None, questions_to_sc
     if not questions:
         return {"error": "Could not determine question slugs. Ensure contest data is fetched."}
     
-    total_tasks = len(users) * len(questions)
+    total_users = len(users)
     completed = 0
     results = []
     
-    print(f"[*] Starting Top 500 AI scan: {len(users)} users × {len(questions)} questions = {total_tasks} replay checks")
+    print(f"[*] Starting Top 500 AI scan: {total_users} users × {len(questions)} questions")
     
-    for user in users:
-        username = user["username"]
+    # We use 10 threads as it proved to be a safe limit to avoid 429 errors from LeetCode
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(_scan_user_worker, user, contest_slug, questions): user for user in users}
         
-        # Fetch rating during scan
-        user_rating = "N/A"
-        attended_count = 0
-        try:
-            import rating_fetcher
-            stats = rating_fetcher.get_rating(user["user_slug"])
-            if stats:
-                if "rating" in stats:
-                    user_rating = stats["rating"]
-                if "attended" in stats:
-                    attended_count = stats["attended"]
-        except Exception as e:
-            print(f"[!] Error fetching rating for {user['user_slug']} in scan: {e}")
-
-        user_result = {
-            "username": username,
-            "user_slug": user["user_slug"],
-            "rank": user["rank"],
-            "rating": user_rating,
-            "attended": attended_count,
-            "questions": {},
-            "total_ai_score": 0,
-            "total_reasons": []
-        }
-        
-        max_score = 0
-        all_reasons = []
-        
-        for q_id, title_slug in questions.items():
+        for future in as_completed(futures):
             try:
-                analysis = analyze_replay_for_ai(contest_slug, username, title_slug)
-                user_result["questions"][q_id] = {
-                    "ai_score": analysis["ai_score"],
-                    "reasons": analysis["reasons"],
-                    "paste_events": analysis["paste_events"],
-                    "paste_ratio": analysis["paste_ratio"],
-                    "final_code": analysis["final_code"]
-                }
-                
-                if analysis["ai_score"] > max_score:
-                    max_score = analysis["ai_score"]
-                all_reasons.extend(analysis["reasons"])
-                
+                user_result = future.result()
+                results.append(user_result)
             except Exception as e:
-                print(f"[!] Error scanning {username} for {q_id}: {e}")
-                user_result["questions"][q_id] = {
-                    "ai_score": 0, "reasons": ["Scan error"], 
-                    "paste_events": [], "paste_ratio": 0, "final_code": ""
-                }
+                print(f"[!] Worker error during scan: {e}")
             
             completed += 1
             if progress_callback:
-                progress_callback(int((completed / total_tasks) * 100))
-            
-            # Rate limiting — gentle delay between API calls
-            time.sleep(0.3)
-        
-        user_result["total_ai_score"] = max_score
-        user_result["total_reasons"] = list(set(all_reasons))
-        results.append(user_result)
+                progress_callback(int((completed / total_users) * 100))
     
     # Sort by AI score descending
     results.sort(key=lambda r: r["total_ai_score"], reverse=True)

@@ -109,6 +109,7 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
         top500_scan: { status: 'idle', progress: 0 }
     });
     const [pageLimit, setPageLimit] = useState(10);
+    const [scanStart, setScanStart] = useState(1);
     const [scanLimit, setScanLimit] = useState(500);
     const [selectedQuestions, setSelectedQuestions] = useState(['Q3', 'Q4']);
 
@@ -198,15 +199,24 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
                 color="amber"
                 status={taskStatus.top500_scan.status}
                 progress={taskStatus.top500_scan.progress}
-                onClick={() => triggerTask('top500_scan', 'top500_scan', { limit: scanLimit || 500, questions: selectedQuestions.length > 0 ? selectedQuestions : ["Q3", "Q4"] })}
+                onClick={() => triggerTask('top500_scan', 'top500_scan', { limit: scanLimit || 500, start_rank: scanStart || 1, questions: selectedQuestions.length > 0 ? selectedQuestions : ["Q3", "Q4"] })}
                 extraAction={
                     <div className="flex gap-4">
                         <div className="flex flex-col w-16">
-                            <label className="text-[10px] text-slate-500 font-mono mb-1">USERS</label>
+                            <label className="text-[10px] text-slate-500 font-mono mb-1">START</label>
                             <input
                                 type="number"
                                 min="1"
-                                max="500"
+                                value={scanStart}
+                                onChange={(e) => setScanStart(e.target.value === '' ? '' : parseInt(e.target.value))}
+                                className="bg-slate-900 border border-slate-700 rounded text-white text-sm px-2 py-1 outline-none focus:border-amber-500"
+                            />
+                        </div>
+                        <div className="flex flex-col w-16">
+                            <label className="text-[10px] text-slate-500 font-mono mb-1">END</label>
+                            <input
+                                type="number"
+                                min="1"
                                 value={scanLimit}
                                 onChange={(e) => setScanLimit(e.target.value === '' ? '' : parseInt(e.target.value))}
                                 className="bg-slate-900 border border-slate-700 rounded text-white text-sm px-2 py-1 outline-none focus:border-amber-500"
