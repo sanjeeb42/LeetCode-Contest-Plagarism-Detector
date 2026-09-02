@@ -637,6 +637,213 @@ def export_keyword_cheaters():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/batch_check_ai', methods=['POST'])
+def batch_check_ai():
+    slug = request.form.get("contest_slug")
+    threshold_str = request.form.get("threshold") or "60"
+    
+    try:
+        threshold = int(threshold_str)
+    except ValueError:
+        threshold = 60
+        
+    if not slug:
+        return jsonify({"error": "Missing contest_slug"}), 400
+        
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+        
+    results = plagiarism_detector.load_top500_results(slug)
+    if not results or "suspects" not in results:
+        return jsonify({"error": "No pre-computed Top 500 AI results found for this contest. Please run the Top 500 AI Scan first."}), 404
+        
+    suspects_map = {}
+    for s in results.get("suspects", []):
+        username = s.get("username", "")
+        user_slug = s.get("user_slug", "")
+        score = s.get("total_ai_score", 0)
+        if username:
+            suspects_map[username.lower()] = score
+        if user_slug:
+            suspects_map[user_slug.lower()] = score
+            
+    overrides = plagiarism_detector.get_manual_overrides(slug)
+    
+    import io
+    import csv
+    
+    try:
+        file_bytes = file.read()
+        try:
+            file_content = file_bytes.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            file_content = file_bytes.decode('latin-1')
+            
+        # Parse lines manually first to handle headerless files
+        lines = [line.strip() for line in file_content.splitlines()]
+        # Filter out empty lines
+        lines = [l for l in lines if l.strip()]
+        
+        if not lines:
+            return jsonify({"error": "The uploaded file is empty"}), 400
+        
+        # Detect if the file has a proper CSV header or is just a plain list of usernames
+        first_line = lines[0]
+        has_comma = ',' in first_line
+        
+        # Check if first line looks like a header (contains known header keywords)
+        header_candidates = ["user_slug", "userslug", "username", "user", "handle", "name", "candidate", "participant", "rank", "rating", "score", "email"]
+        first_line_lower = first_line.lower().replace(" ", "").replace("_", "").replace("-", "").replace('"', '').replace("'", "")
+        
+        is_header = False
+        if has_comma:
+            # Multi-column CSV - check if any field in the first row matches a header keyword
+            stream = io.StringIO(first_line)
+            try:
+                first_row_fields = next(csv.reader(stream))
+            except StopIteration:
+                first_row_fields = [first_line]
+            for field in first_row_fields:
+                field_clean = field.strip().lower().replace(" ", "").replace("_", "").replace("-", "")
+                if any(cand in field_clean for cand in header_candidates):
+                    is_header = True
+                    break
+        else:
+            # Single-column file - check if the first line itself is a header keyword
+            if any(cand in first_line_lower for cand in header_candidates):
+                is_header = True
+        
+        # Parse the CSV content
+        if has_comma:
+            # Standard CSV with commas
+            stream = io.StringIO(file_content)
+            try:
+                sample = file_content[:2048]
+                dialect = csv.Sniffer().sniff(sample)
+                reader = csv.reader(stream, dialect)
+            except Exception:
+                stream.seek(0)
+                reader = csv.reader(stream)
+            rows = [row for row in reader if any(cell.strip() for cell in row)]
+        else:
+            # Single-column file (plain list of usernames, one per line)
+            rows = [[l.strip()] for l in lines if l.strip()]
+        
+        if not rows:
+            return jsonify({"error": "The uploaded file is empty"}), 400
+        
+        # If no header detected, synthesize one
+        if is_header:
+            headers = rows[0]
+            data_rows = rows[1:]
+        else:
+            # No header row — treat all rows as data
+            if len(rows[0]) == 1:
+                headers = ["user_slug"]
+            else:
+                headers = [f"Column_{i+1}" for i in range(len(rows[0]))]
+            data_rows = rows
+        
+        username_column = request.form.get("username_column")
+        username_col_idx = -1
+        
+        if username_column and username_column in headers:
+            username_col_idx = headers.index(username_column)
+        else:
+            candidates_order = ["user_slug", "userslug", "username", "user", "handle", "name", "candidate", "participant"]
+            for cand in candidates_order:
+                for idx, h in enumerate(headers):
+                    h_clean = h.lower().replace(" ", "").replace("_", "").replace("-", "")
+                    if cand in h_clean:
+                        username_col_idx = idx
+                        break
+                if username_col_idx != -1:
+                    break
+            
+            if username_col_idx == -1:
+                username_col_idx = 0
+                
+        new_headers = list(headers)
+        new_headers.append("AI Score")
+        new_headers.append(f"AI Score >= {threshold}")
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(new_headers)
+        
+        preview_rows = []
+        yes_count = 0
+        no_count = 0
+        total_rows = 0
+        
+        for idx, row in enumerate(data_rows):
+            if not row or not any(cell.strip() for cell in row):
+                continue
+                
+            total_rows += 1
+            if username_col_idx < len(row):
+                username_val = row[username_col_idx].strip()
+            else:
+                username_val = ""
+                
+            score = None
+            if username_val:
+                val_lower = username_val.lower()
+                score = suspects_map.get(val_lower)
+                
+            is_ai_override = overrides.get(username_val)
+            
+            if score is not None:
+                score_display = str(score)
+                is_ai = "Yes" if score >= threshold else "No"
+            else:
+                if is_ai_override is True:
+                    score_display = "N/A (AI Override)"
+                    is_ai = "Yes"
+                else:
+                    score_display = "N/A"
+                    is_ai = "No"
+                    
+            if is_ai == "Yes":
+                yes_count += 1
+            else:
+                no_count += 1
+                
+            new_row = list(row)
+            new_row.append(score_display)
+            new_row.append(is_ai)
+            writer.writerow(new_row)
+            
+            if len(preview_rows) < 100:
+                preview_rows.append({
+                    "row_index": idx + 1,
+                    "username": username_val,
+                    "score": score_display,
+                    "is_ai": is_ai,
+                    "original_data": {headers[i]: (row[i] if i < len(row) else "") for i in range(len(headers))}
+                })
+                
+        return jsonify({
+            "success": True,
+            "total_rows": total_rows,
+            "yes_count": yes_count,
+            "no_count": no_count,
+            "threshold": threshold,
+            "headers": headers,
+            "detected_column": headers[username_col_idx] if username_col_idx < len(headers) else "",
+            "preview": preview_rows,
+            "csv_data": output.getvalue()
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to process CSV file: {str(e)}"}), 500
+
 if __name__ == '__main__':
     # Initial Cloud Sync in background so it doesn't block Render port binding
     threading.Thread(target=s3.download_all, daemon=True).start()

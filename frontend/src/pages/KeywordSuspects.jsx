@@ -4,7 +4,7 @@ import axios from 'axios';
 import { 
     ArrowLeft, ShieldAlert, Key, Search, Plus, Trash2, Play, 
     Download, RefreshCw, Check, X, ExternalLink, AlertTriangle, 
-    Loader2, Code2, Tag, ChevronDown, ChevronUp, Sparkles
+    Loader2, Code2, Tag, ChevronDown, ChevronUp, Sparkles, FileSpreadsheet, Bot
 } from 'lucide-react';
 import ReplayViewer from '../components/ReplayViewer';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -206,17 +206,45 @@ function KeywordSuspects() {
 
             {/* Header Navbar */}
             <header className="sticky top-0 z-50 glass-panel rounded-none border-t-0 border-x-0 border-b-white/10 shadow-none">
-                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link to={`/contest/${slug}`} className="p-2 hover:bg-white/10 rounded-md transition-colors text-gray-400 hover:text-white">
+                        <Link to={`/contest/${slug}`} className="p-2.5 bg-slate-900/60 hover:bg-slate-800/80 border border-white/5 hover:border-white/10 rounded-xl transition-all duration-200 text-gray-400 hover:text-white active:scale-95">
                             <ArrowLeft className="w-5 h-5" />
                         </Link>
                         <div className="flex items-center gap-3">
                             <Key className="w-6 h-6 text-red-500" />
                             <div>
                                 <h1 className="text-lg font-semibold text-white tracking-tight">Keyword <span className="text-red-400 font-normal">Cheating Detector</span></h1>
+                                <p className="text-[10px] text-gray-500 font-mono mt-0.5">Contest: {slug}</p>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Navigation tabs for consistent UX */}
+                    <div className="flex items-center gap-1.5 p-1 bg-black/60 border border-white/10 rounded-xl backdrop-blur-md shrink-0">
+                        <Link
+                            to={`/contest/${slug}/ai-suspects`}
+                            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200 inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                        >
+                            <Bot className="w-3.5 h-3.5 text-gray-400" />
+                            <span>AI Suspects</span>
+                        </Link>
+
+                        <Link
+                            to={`/contest/${slug}/keyword-suspects`}
+                            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition-all duration-200 inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 shadow-[0_0_12px_rgba(239,68,68,0.15)]"
+                        >
+                            <Key className="w-3.5 h-3.5 text-red-400" />
+                            <span>Keyword Cheaters</span>
+                        </Link>
+
+                        <Link
+                            to={`/contest/${slug}/batch-checker`}
+                            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200 inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                        >
+                            <FileSpreadsheet className="w-3.5 h-3.5 text-gray-400" />
+                            <span>Batch Checker</span>
+                        </Link>
                     </div>
 
                     <div className="flex items-center gap-4">

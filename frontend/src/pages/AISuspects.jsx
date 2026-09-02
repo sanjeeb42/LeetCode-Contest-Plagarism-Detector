@@ -4,7 +4,7 @@ import axios from 'axios';
 import { 
     ArrowLeft, ShieldAlert, Cpu, Loader2, AlertTriangle, CheckCircle, 
     Eye, Play, ChevronDown, ChevronUp, ExternalLink, Filter, Search, 
-    RefreshCw, Check, X, Terminal, Copy, Code2, Users, ChevronRight, Key, Bot 
+    RefreshCw, Check, X, Terminal, Copy, Code2, Users, ChevronRight, Key, Bot, FileSpreadsheet
 } from 'lucide-react';
 import ReplayViewer from '../components/ReplayViewer';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -206,6 +206,33 @@ function AISuspects() {
                                 <p className="text-xs text-gray-500 font-mono mt-0.5">Contest: {slug}</p>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Navigation tabs for consistent UX */}
+                    <div className="flex items-center gap-1.5 p-1 bg-black/60 border border-white/10 rounded-xl backdrop-blur-md shrink-0">
+                        <Link
+                            to={`/contest/${slug}/ai-suspects`}
+                            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all duration-200 inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                        >
+                            <Bot className="w-3.5 h-3.5 text-amber-400" />
+                            <span>AI Suspects</span>
+                        </Link>
+
+                        <Link
+                            to={`/contest/${slug}/keyword-suspects`}
+                            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200 inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                        >
+                            <Key className="w-3.5 h-3.5 text-gray-400" />
+                            <span>Keyword Cheaters</span>
+                        </Link>
+
+                        <Link
+                            to={`/contest/${slug}/batch-checker`}
+                            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200 inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                        >
+                            <FileSpreadsheet className="w-3.5 h-3.5 text-gray-400" />
+                            <span>Batch Checker</span>
+                        </Link>
                     </div>
                 </div>
             </header>
