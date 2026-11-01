@@ -1,4 +1,5 @@
 import os
+import json
 import csv
 import subprocess
 import requests
@@ -85,7 +86,7 @@ def load_user_ranks(contest_slug):
     return ranks
 
 def load_user_slugs(contest_slug):
-    _, csv_file, _, _ = get_paths(contest_slug)
+    output_dir, csv_file, _, _ = get_paths(contest_slug)
     slugs = {}
     if os.path.exists(csv_file):
         with open(csv_file, "r", encoding="utf-8") as f:
@@ -93,6 +94,33 @@ def load_user_slugs(contest_slug):
             for row in reader:
                 # Fallback to user if slug missing (for backward compatibility)
                 slugs[row["user"]] = row.get("slug", row["user"])
+    
+    # Also check if raw_data.json exists (if csv not generated or missing users)
+    raw_path = os.path.join(output_dir, "raw_data.json")
+    if os.path.exists(raw_path):
+        try:
+            with open(raw_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                for entry in data.get("total_rank", []):
+                    u = entry.get("username")
+                    s = entry.get("user_slug") or u
+                    if u and u not in slugs:
+                        slugs[u] = s
+        except Exception:
+            pass
+
+    # Also check cached user slugs mapping
+    user_slugs_cache_file = os.path.join(output_dir, "user_slugs.json")
+    if os.path.exists(user_slugs_cache_file):
+        try:
+            with open(user_slugs_cache_file, "r", encoding="utf-8") as f:
+                cached_map = json.load(f)
+                for u, s in cached_map.items():
+                    if u not in slugs:
+                        slugs[u] = s
+        except Exception:
+            pass
+            
     return slugs
 
 def load_user_submission_ids(contest_slug):
@@ -210,31 +238,80 @@ def get_submission_code(contest_slug, question_id, username):
 
 _ai_cache = None
 
-def get_title_slug(contest_slug, question_id):
+def get_contest_questions(contest_slug):
     """
-    Reads raw_data.json to find the title_slug for a given question_id (e.g. Q3).
-    question_id maps to index 0, 1, 2, 3 in the questions array.
+    Returns the list of question objects for a contest.
+    Tries raw_data.json first; if not found or empty, fetches from LeetCode contest info API
+    and caches in contest_report_{contest_slug}/questions.json.
     """
     output_dir, _, _, _ = get_paths(contest_slug)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 1. Try raw_data.json
     raw_path = os.path.join(output_dir, "raw_data.json")
+    if os.path.exists(raw_path):
+        try:
+            with open(raw_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                questions = data.get("questions", [])
+                if questions:
+                    return questions
+        except Exception:
+            pass
+
+    # 2. Try questions.json cache
+    q_cache_path = os.path.join(output_dir, "questions.json")
+    if os.path.exists(q_cache_path):
+        try:
+            with open(q_cache_path, "r", encoding="utf-8") as f:
+                questions = json.load(f)
+                if questions:
+                    return questions
+        except Exception:
+            pass
+
+    # 3. Live fetch from contest info API
     try:
-        import json
-        with open(raw_path, "r") as f:
-            data = json.load(f)
-            q_idx = int(question_id.replace("Q", "")) - 1
-            if 0 <= q_idx < len(data.get("questions", [])):
-                return data["questions"][q_idx].get("title_slug")
+        from curl_cffi import requests
+        url = f"https://leetcode.com/contest/api/info/{contest_slug}/"
+        resp = requests.get(url, impersonate="chrome", timeout=12)
+        if resp.status_code == 200:
+            data = resp.json()
+            questions = data.get("questions", [])
+            if questions:
+                try:
+                    with open(q_cache_path, "w", encoding="utf-8") as f:
+                        json.dump(questions, f, indent=2)
+                except Exception:
+                    pass
+                return questions
+    except Exception as e:
+        print(f"[!] Error fetching contest questions for {contest_slug}: {e}")
+
+    return []
+
+def get_title_slug(contest_slug, question_id):
+    """
+    Finds the title_slug for a given question_id (e.g. Q3).
+    question_id maps to index 0, 1, 2, 3 in the questions array.
+    """
+    try:
+        q_idx = int(question_id.replace("Q", "")) - 1
+        questions = get_contest_questions(contest_slug)
+        if 0 <= q_idx < len(questions):
+            return questions[q_idx].get("title_slug")
     except Exception:
         pass
     return None
 
-def fetch_typing_replay(contest_slug, title_slug, username):
+def fetch_typing_replay(contest_slug, title_slug, username, user_slug=None):
     from curl_cffi import requests
     import json
     
-    # Map username (which might be display name) to user_slug
-    slugs_map = load_user_slugs(contest_slug)
-    user_slug = slugs_map.get(username, username)
+    # Map username (which might be display name) to user_slug if not directly passed
+    if not user_slug:
+        slugs_map = load_user_slugs(contest_slug)
+        user_slug = slugs_map.get(username, username)
     
     # --- Cache: check for cached replay events on disk ---
     output_dir, _, _, _ = get_paths(contest_slug)
@@ -303,21 +380,14 @@ def fetch_typing_replay(contest_slug, title_slug, username):
 
 def get_question_id(contest_slug, title_slug):
     """Returns the numeric question_id for a given title_slug."""
-    output_dir, _, _, _ = get_paths(contest_slug)
-    raw_path = os.path.join(output_dir, "raw_data.json")
-    try:
-        import json
-        with open(raw_path, "r") as f:
-            data = json.load(f)
-            for q in data.get("questions", []):
-                if q.get("title_slug") == title_slug:
-                    return str(q.get("question_id"))
-    except Exception:
-        pass
+    questions = get_contest_questions(contest_slug)
+    for q in questions:
+        if q.get("title_slug") == title_slug:
+            return str(q.get("question_id"))
     return None
 
-def get_typing_replay_frames(contest_slug, title_slug, username):
-    events = fetch_typing_replay(contest_slug, title_slug, username)
+def get_typing_replay_frames(contest_slug, title_slug, username, user_slug=None):
+    events = fetch_typing_replay(contest_slug, title_slug, username, user_slug=user_slug)
     frames = []
     code_state = ""
     
@@ -463,54 +533,133 @@ def get_manual_overrides(contest_slug):
 
 # --- TOP 500 AI SUSPECT SCANNER ---
 
+def fetch_ranking_users_range(contest_slug, start_rank=1, end_rank=500):
+    """
+    Directly fetches users in the given rank range from LeetCode contest ranking API without
+    requiring the full submission fetch pipeline.
+    """
+    from curl_cffi import requests
+    import math
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    output_dir, _, _, _ = get_paths(contest_slug)
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Each page has 25 users. Determine pages needed.
+    start_page = max(1, math.floor((start_rank - 1) / 25) + 1)
+    end_page = max(start_page, math.ceil(end_rank / 25))
+    pages_to_fetch = list(range(start_page, end_page + 1))
+
+    page_results = {}
+
+    def fetch_page(page_num):
+        url = f"https://leetcode.com/contest/api/ranking/{contest_slug}/?pagination={page_num}&region=global"
+        for attempt in range(3):
+            try:
+                resp = requests.get(url, impersonate="chrome", timeout=12)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return page_num, data.get("total_rank", [])
+            except Exception as e:
+                pass
+            import time
+            time.sleep(0.5)
+        return page_num, []
+
+    # Fetch pages concurrently
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = [executor.submit(fetch_page, p) for p in pages_to_fetch]
+        for f in as_completed(futures):
+            p_num, ranks = f.result()
+            page_results[p_num] = ranks
+
+    # Aggregate in page order
+    all_ranks = []
+    for p in pages_to_fetch:
+        all_ranks.extend(page_results.get(p, []))
+
+    # Save user slugs to user_slugs.json cache
+    slugs_cache_file = os.path.join(output_dir, "user_slugs.json")
+    slug_map = {}
+    if os.path.exists(slugs_cache_file):
+        try:
+            with open(slugs_cache_file, "r", encoding="utf-8") as f:
+                slug_map = json.load(f)
+        except Exception:
+            pass
+
+    users = []
+    for rank_entry in all_ranks:
+        if rank_entry.get("data_region") == "CN":
+            continue
+        uname = rank_entry.get("username")
+        uslug = rank_entry.get("user_slug") or uname
+        if uname:
+            slug_map[uname] = uslug
+            users.append({
+                "username": uname,
+                "user_slug": uslug,
+                "rank": rank_entry.get("rank", 99999)
+            })
+
+    try:
+        with open(slugs_cache_file, "w", encoding="utf-8") as f:
+            json.dump(slug_map, f, indent=2)
+    except Exception:
+        pass
+
+    users.sort(key=lambda u: u["rank"])
+    # 1-based start_rank index slice
+    start_idx = max(0, start_rank - 1)
+    return users[start_idx:end_rank]
+
 def get_top_users_range(contest_slug, start_rank=1, end_rank=500):
-    """Reads the already-fetched raw_data.json and returns users within the given rank range."""
+    """
+    Returns users within the given rank range.
+    Uses raw_data.json if present; otherwise, directly queries LeetCode's ranking API on-demand.
+    """
     import json
     output_dir, _, _, _ = get_paths(contest_slug)
     raw_json_file = os.path.join(output_dir, "raw_data.json")
     
-    if not os.path.exists(raw_json_file):
-        return []
-    
-    try:
-        with open(raw_json_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
-        return []
-    
-    total_rank = data.get("total_rank", [])
-    
-    # Filter out CN region users and sort by rank
-    users = []
-    submissions_list = data.get("submissions", [])
-    for i, rank_entry in enumerate(total_rank):
-        # Check CN region
-        is_cn = False
-        if i < len(submissions_list):
-            for q_val in submissions_list[i].values():
-                if isinstance(q_val, dict) and q_val.get("data_region") == "CN":
-                    is_cn = True
-                    break
-        if is_cn:
-            continue
-            
-        users.append({
-            "username": rank_entry.get("username"),
-            "user_slug": rank_entry.get("user_slug") or rank_entry.get("username"),
-            "rank": rank_entry.get("rank", 99999)
-        })
-    
-    # Sort by rank and return the requested range
-    users.sort(key=lambda u: u["rank"])
-    # Convert 1-based start_rank to 0-based index
-    start_idx = max(0, start_rank - 1)
-    return users[start_idx:end_rank]
+    if os.path.exists(raw_json_file):
+        try:
+            with open(raw_json_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            total_rank = data.get("total_rank", [])
+            submissions_list = data.get("submissions", [])
+            if total_rank:
+                users = []
+                for i, rank_entry in enumerate(total_rank):
+                    is_cn = rank_entry.get("data_region") == "CN"
+                    if not is_cn and i < len(submissions_list):
+                        for q_val in submissions_list[i].values():
+                            if isinstance(q_val, dict) and q_val.get("data_region") == "CN":
+                                is_cn = True
+                                break
+                    if is_cn:
+                        continue
+                    users.append({
+                        "username": rank_entry.get("username"),
+                        "user_slug": rank_entry.get("user_slug") or rank_entry.get("username"),
+                        "rank": rank_entry.get("rank", 99999)
+                    })
+                users.sort(key=lambda u: u["rank"])
+                start_idx = max(0, start_rank - 1)
+                selected = users[start_idx:end_rank]
+                if selected:
+                    return selected
+        except Exception:
+            pass
 
-def analyze_replay_for_ai(contest_slug, username, title_slug):
+    # If raw_data.json doesn't exist or doesn't have enough users, fetch directly from ranking API
+    return fetch_ranking_users_range(contest_slug, start_rank=start_rank, end_rank=end_rank)
+
+def analyze_replay_for_ai(contest_slug, username, title_slug, user_slug=None):
     """Analyzes a single user's typing replay for AI indicators in their pasted code."""
     import json
     
-    events = fetch_typing_replay(contest_slug, title_slug, username) or []
+    events = fetch_typing_replay(contest_slug, title_slug, username, user_slug=user_slug) or []
     
     if not events:
         return {"ai_score": 0, "reasons": [], "paste_events": [], "paste_ratio": 0, "final_code": ""}
@@ -688,7 +837,7 @@ def _scan_user_worker(user, contest_slug, questions):
     
     for q_id, title_slug in questions.items():
         try:
-            analysis = analyze_replay_for_ai(contest_slug, username, title_slug)
+            analysis = analyze_replay_for_ai(contest_slug, username, title_slug, user_slug=user["user_slug"])
             user_result["questions"][q_id] = {
                 "ai_score": analysis["ai_score"],
                 "reasons": analysis["reasons"],
@@ -724,7 +873,7 @@ def run_top500_scan(contest_slug, n=500, start_rank=1, progress_callback=None, q
     # Get top N users within range
     users = get_top_users_range(contest_slug, start_rank=start_rank, end_rank=n)
     if not users:
-        return {"error": "No users found. Run 'Fetch Submissions' first."}
+        return {"error": f"No users found for ranks {start_rank} to {n}. Please verify contest slug."}
     
     if questions_to_scan is None:
         questions_to_scan = ["Q3", "Q4"]
@@ -737,7 +886,7 @@ def run_top500_scan(contest_slug, n=500, start_rank=1, progress_callback=None, q
             questions[q_id] = slug
     
     if not questions:
-        return {"error": "Could not determine question slugs. Ensure contest data is fetched."}
+        return {"error": f"Could not determine question slugs for contest {contest_slug}."}
     
     total_users = len(users)
     completed = 0
