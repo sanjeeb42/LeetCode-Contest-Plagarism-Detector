@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Loader2, Play, Download, CheckCircle, AlertCircle, Scan, ChevronDown, ChevronUp, Bot, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
