@@ -118,7 +118,7 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
     const pollStatus = async (taskName) => {
         const interval = setInterval(async () => {
             try {
-                const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/status?contest_slug=${contestSlug}`);
+                const resp = await axios.get(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/status?contest_slug=${contestSlug}`);
                 const statusData = resp.data[taskName];
                 const status = statusData.status;
                 const progress = statusData.progress;
@@ -150,7 +150,7 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
         setTaskStatus(prev => ({ ...prev, [task]: { status: 'running', progress: 0 } }));
 
         try {
-            await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/${endpoint}`, { contest_slug: contestSlug, ...payload });
+            await axios.post(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/${endpoint}`, { contest_slug: contestSlug, ...payload });
             pollStatus(task);
         } catch (error) {
             console.error(error);

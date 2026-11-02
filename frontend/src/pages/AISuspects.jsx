@@ -71,11 +71,11 @@ function AISuspects() {
         setLoading(true);
         setError(null);
         try {
-            const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/top500_results?contest_slug=${slug}`);
+            const resp = await axios.get(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/top500_results?contest_slug=${slug}`);
             setData(resp.data);
             
             try {
-                const overridesResp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/manual_overrides?contest_slug=${slug}`);
+                const overridesResp = await axios.get(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/manual_overrides?contest_slug=${slug}`);
                 setVerifiedCheaters(overridesResp.data || {});
             } catch (err) {
                 console.warn('Could not fetch manual overrides', err);
@@ -104,7 +104,7 @@ function AISuspects() {
             return updated;
         });
         try {
-            await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/override_ai`, {
+            await axios.post(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/override_ai`, {
                 contest_slug: slug,
                 username: username,
                 is_ai: newStatus === undefined ? null : newStatus
@@ -125,7 +125,7 @@ function AISuspects() {
     };
 
     const handleExportAI = () => {
-        window.location.href = `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/export_ai_cheaters?contest_slug=${slug}`;
+        window.location.href = `${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/export_ai_cheaters?contest_slug=${slug}`;
     };
 
     const getScoreColor = (score) => {

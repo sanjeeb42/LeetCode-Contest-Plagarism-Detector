@@ -32,7 +32,7 @@ function ClusterDetails() {
 
         setLoadingCodes(prev => ({ ...prev, [username]: true }));
         try {
-            const resp = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/submission_code`, {
+            const resp = await axios.post(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/submission_code`, {
                 contest_slug: slug,
                 question_id: questionId,
                 username: username
@@ -70,7 +70,7 @@ function ClusterDetails() {
     const handleOverride = async (username, isAI) => {
         setOverriding(prev => ({ ...prev, [username]: true }));
         try {
-            await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/override_ai`, {
+            await axios.post(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/override_ai`, {
                 contest_slug: slug,
                 username: username,
                 is_ai: isAI

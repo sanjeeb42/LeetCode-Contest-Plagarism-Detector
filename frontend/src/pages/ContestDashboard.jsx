@@ -20,7 +20,7 @@ function ContestDashboard() {
     const fetchReport = useCallback(async () => {
         setLoading(true);
         try {
-            const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/results?threshold=${threshold}&contest_slug=${slug}`);
+            const resp = await axios.get(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/results?threshold=${threshold}&contest_slug=${slug}`);
             setClusters(resp.data);
         } catch (error) {
             console.error("Failed to fetch results:", error);
@@ -35,7 +35,7 @@ function ContestDashboard() {
     }, [fetchReport]);
 
     const handleExport = () => {
-        window.location.href = `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/export?contest_slug=${slug}&threshold=${threshold}`;
+        window.location.href = `${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/export?contest_slug=${slug}&threshold=${threshold}`;
     };
 
     const handleDelete = async () => {
@@ -44,7 +44,7 @@ function ContestDashboard() {
 
         setLoading(true);
         try {
-            await axios.delete(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/contest?contest_slug=${slug}`);
+            await axios.delete(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/contest?contest_slug=${slug}`);
             localStorage.removeItem(`top500_${slug}`);
             navigate('/');
         } catch (error) {

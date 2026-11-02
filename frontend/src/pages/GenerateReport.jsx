@@ -34,7 +34,7 @@ function GenerateReport() {
         formData.append('file', selectedFile);
 
         try {
-            const resp = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/generate_report`, formData, {
+            const resp = await axios.post(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/generate_report`, formData, {
                 responseType: 'blob', // Important for file download
                 headers: {
                     'Content-Type': 'multipart/form-data',

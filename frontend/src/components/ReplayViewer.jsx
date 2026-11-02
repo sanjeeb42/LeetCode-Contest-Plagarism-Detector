@@ -28,7 +28,7 @@ const ReplayViewer = ({ contestSlug, questionId, username, userSlug, onClose }) 
         let cancelled = false;
         const fetchReplay = async () => {
             try {
-                const resp = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/typing_replay`, {
+                const resp = await axios.post(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/typing_replay`, {
                     contest_slug: contestSlug,
                     question_id: questionId,
                     username: username,

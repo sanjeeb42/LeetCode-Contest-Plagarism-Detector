@@ -37,7 +37,7 @@ function KeywordSuspects() {
     // Fetch initial keywords and results
     const fetchKeywords = async () => {
         try {
-            const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/contest_keywords?contest_slug=${slug}`);
+            const resp = await axios.get(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/contest_keywords?contest_slug=${slug}`);
             if (resp.data.keywords) {
                 setKeywords(resp.data.keywords);
             }
@@ -50,7 +50,7 @@ function KeywordSuspects() {
         setLoading(true);
         setError(null);
         try {
-            const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/keyword_results?contest_slug=${slug}`);
+            const resp = await axios.get(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/keyword_results?contest_slug=${slug}`);
             setData(resp.data);
             if (resp.data.keywords && resp.data.keywords.length > 0) {
                 setKeywords(resp.data.keywords);
@@ -65,7 +65,7 @@ function KeywordSuspects() {
 
     const fetchManualOverrides = async () => {
         try {
-            const overridesResp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/manual_overrides?contest_slug=${slug}`);
+            const overridesResp = await axios.get(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/manual_overrides?contest_slug=${slug}`);
             setVerifiedCheaters(overridesResp.data || {});
         } catch (err) {
             console.warn('Could not fetch manual overrides:', err);
@@ -84,7 +84,7 @@ function KeywordSuspects() {
         if (isScanning) {
             interval = setInterval(async () => {
                 try {
-                    const resp = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/status?contest_slug=${slug}`);
+                    const resp = await axios.get(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/status?contest_slug=${slug}`);
                     const status = resp.data?.keyword_scan;
                     if (status) {
                         setScanProgress(status);
@@ -135,13 +135,13 @@ function KeywordSuspects() {
 
         try {
             // Save keywords
-            await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/contest_keywords`, {
+            await axios.post(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/contest_keywords`, {
                 contest_slug: slug,
                 keywords: keywords
             });
 
             // Trigger scan
-            await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/keyword_scan`, {
+            await axios.post(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/keyword_scan`, {
                 contest_slug: slug,
                 keywords: keywords,
                 limit: 500,
@@ -167,7 +167,7 @@ function KeywordSuspects() {
         });
 
         try {
-            await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/override_ai`, {
+            await axios.post(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/override_ai`, {
                 contest_slug: slug,
                 username: username,
                 is_ai: newStatus === undefined ? null : newStatus
@@ -195,7 +195,7 @@ function KeywordSuspects() {
     });
 
     const handleExportCSV = () => {
-        window.location.href = `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/export_keyword_cheaters?contest_slug=${slug}`;
+        window.location.href = `${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/export_keyword_cheaters?contest_slug=${slug}`;
     };
 
     return (

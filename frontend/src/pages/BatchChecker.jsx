@@ -143,7 +143,7 @@ function BatchChecker() {
         formData.append("username_column", selectedColumn);
 
         try {
-            const resp = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5050'}/api/batch_check_ai`, formData, {
+            const resp = await axios.post(`${import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : ''}/api/batch_check_ai`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }
