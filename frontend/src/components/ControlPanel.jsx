@@ -109,11 +109,33 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
         analyze: { status: 'idle', progress: 0 },
         top500_scan: { status: 'idle', progress: 0 }
     });
+    const [scanElapsed, setScanElapsed] = useState(0);
+    const [scanTotalTime, setScanTotalTime] = useState(null);
     const [pageLimit, setPageLimit] = useState(10);
     const [scanStart, setScanStart] = useState(1);
     const [scanLimit, setScanLimit] = useState(500);
     const [selectedQuestions, setSelectedQuestions] = useState(['Q3', 'Q4']);
     const [showLegacyTools, setShowLegacyTools] = useState(false);
+
+    // Timer tracking elapsed time while AI scan is running
+    useEffect(() => {
+        let timer;
+        if (taskStatus.top500_scan.status === 'running') {
+            timer = setInterval(() => {
+                setScanElapsed(prev => prev + 1);
+            }, 1000);
+        }
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [taskStatus.top500_scan.status]);
+
+    const formatDuration = (seconds) => {
+        if (seconds < 60) return `${seconds}s`;
+        const mins = Math.floor(seconds / 60);
+        const remSecs = seconds % 60;
+        return `${mins}m ${remSecs}s`;
+    };
 
     const pollStatus = async (taskName) => {
         const interval = setInterval(async () => {
@@ -131,8 +153,14 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
                 if (status === 'success' || status === 'error') {
                     clearInterval(interval);
                     if (status === 'success') {
+                        if (taskName === 'top500_scan') {
+                            setScanElapsed(curr => {
+                                setScanTotalTime(curr);
+                                return curr;
+                            });
+                        }
                         if (onRefresh) onRefresh();
-                        setTimeout(() => setTaskStatus(prev => ({ ...prev, [taskName]: { status: 'idle', progress: 0 } })), 3000);
+                        setTimeout(() => setTaskStatus(prev => ({ ...prev, [taskName]: { status: 'idle', progress: 0 } })), 4000);
                     } else {
                         alert(`${taskName} failed: ${resp.data[taskName].message}`);
                         setTaskStatus(prev => ({ ...prev, [taskName]: { status: 'idle', progress: 0 } }));
@@ -147,6 +175,10 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
     };
 
     const triggerTask = async (task, endpoint, payload = {}) => {
+        if (task === 'top500_scan') {
+            setScanElapsed(0);
+            setScanTotalTime(null);
+        }
         setTaskStatus(prev => ({ ...prev, [task]: { status: 'running', progress: 0 } }));
 
         try {
@@ -209,7 +241,12 @@ const ControlPanel = ({ onRefresh, contestSlug }) => {
                             {taskStatus.top500_scan.status === 'running' ? (
                                 <>
                                     <Loader2 className="w-4 h-4 animate-spin text-black" />
-                                    <span>Scanning Replays... {taskStatus.top500_scan.progress}%</span>
+                                    <span>Scanning... {taskStatus.top500_scan.progress}% ({formatDuration(scanElapsed)})</span>
+                                </>
+                            ) : scanTotalTime !== null ? (
+                                <>
+                                    <Scan className="w-4 h-4 text-black stroke-[2.5]" />
+                                    <span>Scan Finished ({formatDuration(scanTotalTime)})</span>
                                 </>
                             ) : (
                                 <>
