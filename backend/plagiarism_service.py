@@ -360,7 +360,7 @@ def fetch_typing_replay(contest_slug, title_slug, username, user_slug=None):
                 data = response.json()
                 d = data.get("data")
                 if d:
-                    events = d.get("userContestReplayEvents") or []
+                    events = d.get("userContestReplayEvents")
                     if events:
                         # Save to cache
                         try:
@@ -369,9 +369,18 @@ def fetch_typing_replay(contest_slug, title_slug, username, user_slug=None):
                         except Exception:
                             pass
                         return events
+                    else:
+                        # User did not solve this question or has no replay recorded.
+                        # Do NOT retry; cache empty list so future scans are instant.
+                        try:
+                            with open(cache_file, "w") as f:
+                                json.dump([], f)
+                        except Exception:
+                            pass
+                        return []
             else:
                 print(f"Failed to fetch replay for {username} (status: {response.status_code}): {response.text[:200]}")
-            # Retry after a short delay if no events returned
+            # Retry only on network / server HTTP error
             if attempt < 2:
                 time.sleep(1)
     except Exception as e:
@@ -599,7 +608,8 @@ def fetch_ranking_users_range(contest_slug, start_rank=1, end_rank=500):
             users.append({
                 "username": uname,
                 "user_slug": uslug,
-                "rank": rank_entry.get("rank", 99999)
+                "rank": rank_entry.get("rank", 99999),
+                "submissions": rank_entry.get("submissions") or {}
             })
 
     try:
@@ -642,7 +652,8 @@ def get_top_users_range(contest_slug, start_rank=1, end_rank=500):
                     users.append({
                         "username": rank_entry.get("username"),
                         "user_slug": rank_entry.get("user_slug") or rank_entry.get("username"),
-                        "rank": rank_entry.get("rank", 99999)
+                        "rank": rank_entry.get("rank", 99999),
+                        "submissions": rank_entry.get("submissions") or {}
                     })
                 users.sort(key=lambda u: u["rank"])
                 start_idx = max(0, start_rank - 1)
@@ -806,6 +817,7 @@ def _check_paste_for_ai_phrases(text):
 
 def _scan_user_worker(user, contest_slug, questions):
     username = user["username"]
+    user_submissions = user.get("submissions") or {}
     
     # Fetch rating during scan
     user_rating = "N/A"
@@ -835,7 +847,19 @@ def _scan_user_worker(user, contest_slug, questions):
     max_score = 0
     all_reasons = []
     
-    for q_id, title_slug in questions.items():
+    for q_id, q_info in questions.items():
+        title_slug = q_info["title_slug"]
+        numeric_qid = q_info.get("numeric_qid")
+
+        # Optimization: If the ranking provided submissions dict and this question was not solved,
+        # skip GraphQL query entirely!
+        if user_submissions and numeric_qid and numeric_qid not in user_submissions:
+            user_result["questions"][q_id] = {
+                "ai_score": 0, "reasons": ["Unsolved"], 
+                "paste_events": [], "paste_ratio": 0, "final_code": ""
+            }
+            continue
+
         try:
             analysis = analyze_replay_for_ai(contest_slug, username, title_slug, user_slug=user["user_slug"])
             user_result["questions"][q_id] = {
@@ -878,12 +902,22 @@ def run_top500_scan(contest_slug, n=500, start_rank=1, progress_callback=None, q
     if questions_to_scan is None:
         questions_to_scan = ["Q3", "Q4"]
 
-    # Get question slugs
+    # Build question slugs and numeric question_id mappings
+    contest_questions = get_contest_questions(contest_slug)
     questions = {}
     for q_id in questions_to_scan:
-        slug = get_title_slug(contest_slug, q_id)
-        if slug:
-            questions[q_id] = slug
+        try:
+            q_idx = int(q_id.replace("Q", "")) - 1
+            if 0 <= q_idx < len(contest_questions):
+                q_obj = contest_questions[q_idx]
+                slug = q_obj.get("title_slug")
+                if slug:
+                    questions[q_id] = {
+                        "title_slug": slug,
+                        "numeric_qid": str(q_obj.get("question_id"))
+                    }
+        except Exception:
+            pass
     
     if not questions:
         return {"error": f"Could not determine question slugs for contest {contest_slug}."}
@@ -912,6 +946,13 @@ def run_top500_scan(contest_slug, n=500, start_rank=1, progress_callback=None, q
     # Sort by AI score descending
     results.sort(key=lambda r: r["total_ai_score"], reverse=True)
     
+    # Save ratings cache to disk once at the end of the batch scan
+    try:
+        import rating_fetcher
+        rating_fetcher.save_cache()
+    except Exception as e:
+        print(f"[!] Warning saving rating cache after scan: {e}")
+
     # Save results
     output = {
         "contest_slug": contest_slug,
