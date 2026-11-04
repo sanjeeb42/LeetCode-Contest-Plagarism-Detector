@@ -554,18 +554,20 @@ def fetch_ranking_users_range(contest_slug, start_rank=1, end_rank=500):
     output_dir, _, _, _ = get_paths(contest_slug)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Each page has 25 users. Determine pages needed.
+    # Each page has 25 users. LeetCode ranking API pages are 1-indexed.
+    # Rank 1 is on page 1 (index 0). Rank 5001 is on page 201 (index 5000).
     start_page = max(1, math.floor((start_rank - 1) / 25) + 1)
     end_page = max(start_page, math.ceil(end_rank / 25))
     pages_to_fetch = list(range(start_page, end_page + 1))
 
     page_results = {}
+    headers = {"Accept-Encoding": "gzip, deflate"}
 
     def fetch_page(page_num):
         url = f"https://leetcode.com/contest/api/ranking/{contest_slug}/?pagination={page_num}&region=global"
         for attempt in range(3):
             try:
-                resp = requests.get(url, impersonate="chrome", timeout=12)
+                resp = requests.get(url, headers=headers, impersonate="chrome", timeout=12)
                 if resp.status_code == 200:
                     data = resp.json()
                     return page_num, data.get("total_rank", [])
@@ -576,7 +578,7 @@ def fetch_ranking_users_range(contest_slug, start_rank=1, end_rank=500):
         return page_num, []
 
     # Fetch pages concurrently
-    with ThreadPoolExecutor(max_workers=6) as executor:
+    with ThreadPoolExecutor(max_workers=8) as executor:
         futures = [executor.submit(fetch_page, p) for p in pages_to_fetch]
         for f in as_completed(futures):
             p_num, ranks = f.result()
@@ -603,12 +605,16 @@ def fetch_ranking_users_range(contest_slug, start_rank=1, end_rank=500):
             continue
         uname = rank_entry.get("username")
         uslug = rank_entry.get("user_slug") or uname
-        if uname:
+        raw_rank = rank_entry.get("rank")
+        human_rank = (raw_rank + 1) if raw_rank is not None else 99999
+        
+        # Filter strictly within the requested [start_rank, end_rank]
+        if uname and (start_rank <= human_rank <= end_rank):
             slug_map[uname] = uslug
             users.append({
                 "username": uname,
                 "user_slug": uslug,
-                "rank": rank_entry.get("rank", 99999),
+                "rank": human_rank,
                 "submissions": rank_entry.get("submissions") or {}
             })
 
@@ -619,14 +625,13 @@ def fetch_ranking_users_range(contest_slug, start_rank=1, end_rank=500):
         pass
 
     users.sort(key=lambda u: u["rank"])
-    # 1-based start_rank index slice
-    start_idx = max(0, start_rank - 1)
-    return users[start_idx:end_rank]
+    return users
 
 def get_top_users_range(contest_slug, start_rank=1, end_rank=500):
     """
     Returns users within the given rank range.
-    Uses raw_data.json if present; otherwise, directly queries LeetCode's ranking API on-demand.
+    Uses raw_data.json if it contains the full requested range;
+    otherwise, directly queries LeetCode's ranking API on-demand.
     """
     import json
     output_dir, _, _, _ = get_paths(contest_slug)
@@ -649,21 +654,28 @@ def get_top_users_range(contest_slug, start_rank=1, end_rank=500):
                                 break
                     if is_cn:
                         continue
-                    users.append({
-                        "username": rank_entry.get("username"),
-                        "user_slug": rank_entry.get("user_slug") or rank_entry.get("username"),
-                        "rank": rank_entry.get("rank", 99999),
-                        "submissions": rank_entry.get("submissions") or {}
-                    })
+                    
+                    uname = rank_entry.get("username")
+                    raw_rank = rank_entry.get("rank")
+                    human_rank = (raw_rank + 1) if raw_rank is not None else (i + 1)
+                    
+                    if uname and (start_rank <= human_rank <= end_rank):
+                        users.append({
+                            "username": uname,
+                            "user_slug": rank_entry.get("user_slug") or uname,
+                            "rank": human_rank,
+                            "submissions": rank_entry.get("submissions") or {}
+                        })
+                
                 users.sort(key=lambda u: u["rank"])
-                start_idx = max(0, start_rank - 1)
-                selected = users[start_idx:end_rank]
-                if selected:
-                    return selected
+                expected_count = end_rank - start_rank + 1
+                # If raw_data has all or nearly all of the requested range, use it
+                if len(users) >= min(expected_count, len(total_rank)):
+                    return users
         except Exception:
             pass
 
-    # If raw_data.json doesn't exist or doesn't have enough users, fetch directly from ranking API
+    # If raw_data.json doesn't exist or doesn't cover this rank range, fetch directly from ranking API
     return fetch_ranking_users_range(contest_slug, start_rank=start_rank, end_rank=end_rank)
 
 def analyze_replay_for_ai(contest_slug, username, title_slug, user_slug=None):
