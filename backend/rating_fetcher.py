@@ -114,7 +114,7 @@ def get_rating(username, cache_only=False, force_refresh=False, max_age_seconds=
         response = None
         for attempt in range(3):
             try:
-                response = requests.post(LEETCODE_URL, json=json_payload, headers=headers, impersonate="chrome", timeout=15)
+                response = requests.post(LEETCODE_URL, json=json_payload, headers=headers, impersonate="safari15_5", timeout=15)
                 if response.status_code == 200:
                     break
                 elif response.status_code == 429:

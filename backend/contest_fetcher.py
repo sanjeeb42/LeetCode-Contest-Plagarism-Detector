@@ -131,7 +131,7 @@ def fetch_worker(submission_ids, cache, lc_session_cookie=None):
     results = {}
     
     # Each thread gets its own session
-    with requests.Session(impersonate="chrome") as session:
+    with requests.Session(impersonate="safari15_5") as session:
         session.headers.update({
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Referer": "https://leetcode.com/"
@@ -303,7 +303,7 @@ def run_data_collection(contest_slug, progress_callback=None, page_limit=10):
         return True
 
     # Session setup
-    with requests.Session(impersonate="chrome") as session:
+    with requests.Session(impersonate="safari15_5") as session:
         session.headers.update({
              "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         })

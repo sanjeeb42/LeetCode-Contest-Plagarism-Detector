@@ -274,7 +274,8 @@ def get_contest_questions(contest_slug):
     try:
         from curl_cffi import requests
         url = f"https://leetcode.com/contest/api/info/{contest_slug}/"
-        resp = requests.get(url, impersonate="chrome", timeout=12)
+        headers = {"Accept-Encoding": "gzip, deflate"}
+        resp = requests.get(url, headers=headers, impersonate="safari15_5", timeout=12)
         if resp.status_code == 200:
             data = resp.json()
             questions = data.get("questions", [])
@@ -337,8 +338,6 @@ def fetch_typing_replay(contest_slug, title_slug, username, user_slug=None):
     headers = {
         "accept": "*/*",
         "content-type": "application/json",
-        "x-csrftoken": fake_csrf,
-        "cookie": f"csrftoken={fake_csrf};",
         "referer": "https://leetcode.com/"
     }
 
@@ -355,7 +354,7 @@ def fetch_typing_replay(contest_slug, title_slug, username, user_slug=None):
     try:
         import time
         for attempt in range(3):
-            response = requests.post(url, headers=headers, json=body, impersonate="chrome", timeout=10)
+            response = requests.post(url, headers=headers, json=body, impersonate="safari15_5", timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 d = data.get("data")
@@ -567,7 +566,7 @@ def fetch_ranking_users_range(contest_slug, start_rank=1, end_rank=500):
         url = f"https://leetcode.com/contest/api/ranking/{contest_slug}/?pagination={page_num}&region=global"
         for attempt in range(3):
             try:
-                resp = requests.get(url, headers=headers, impersonate="chrome", timeout=12)
+                resp = requests.get(url, headers=headers, impersonate="safari15_5", timeout=12)
                 if resp.status_code == 200:
                     data = resp.json()
                     return page_num, data.get("total_rank", [])
