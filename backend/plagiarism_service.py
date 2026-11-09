@@ -1146,10 +1146,34 @@ def run_keyword_replay_scan(contest_slug, keywords=None, limit=500, questions_to
     if not patterns:
         return {"error": "No valid keywords or regex patterns provided."}
 
-    # Build question mapping (title_slug -> Q1/Q2/Q3/Q4)
+    # Build user info and question mapping (title_slug -> Q1/Q2/Q3/Q4)
     raw_path = os.path.join(output_dir, "raw_data.json")
+    top500_path = os.path.join(output_dir, "top500_ai_results.json")
     q_map = {}
     user_map = {}
+
+    # 1. First populate from top500_ai_results.json if available
+    if os.path.exists(top500_path):
+        try:
+            with open(top500_path, "r", encoding="utf-8") as f:
+                top_data = json.load(f)
+            for s in top_data.get("suspects", []):
+                u = s.get("username")
+                us = s.get("user_slug") or u
+                r = s.get("rank", 99999)
+                info = {
+                    "username": u,
+                    "user_slug": us,
+                    "rank": r
+                }
+                if u:
+                    user_map[u] = info
+                if us:
+                    user_map[us] = info
+        except Exception as e:
+            print(f"[!] Warning reading top500_ai_results.json in keyword scan: {e}")
+
+    # 2. Populate/supplement from raw_data.json
     if os.path.exists(raw_path):
         try:
             with open(raw_path, "r", encoding="utf-8") as f:
@@ -1163,15 +1187,47 @@ def run_keyword_replay_scan(contest_slug, keywords=None, limit=500, questions_to
             for rank_entry in raw_data.get("total_rank", []):
                 u = rank_entry.get("username")
                 us = rank_entry.get("user_slug") or u
+                raw_rank = rank_entry.get("rank")
+                human_rank = (raw_rank + 1) if raw_rank is not None else 99999
                 info = {
                     "username": u,
                     "user_slug": us,
-                    "rank": rank_entry.get("rank", 99999)
+                    "rank": human_rank
                 }
-                user_map[u] = info
-                user_map[us] = info
+                if u:
+                    user_map[u] = info
+                if us:
+                    user_map[us] = info
         except Exception as e:
             print(f"[!] Warning reading raw_data.json: {e}")
+
+    # 3. Supplement user slugs from user_slugs.json cache if present
+    slugs_cache_file = os.path.join(output_dir, "user_slugs.json")
+    if os.path.exists(slugs_cache_file):
+        try:
+            with open(slugs_cache_file, "r", encoding="utf-8") as f:
+                slug_dict = json.load(f)
+            for uname, uslug in slug_dict.items():
+                if uname in user_map and uslug not in user_map:
+                    user_map[uslug] = user_map[uname]
+                elif uslug in user_map and uname not in user_map:
+                    user_map[uname] = user_map[uslug]
+        except Exception:
+            pass
+
+    # 4. Fallback question mapping from questions.json if empty
+    if not q_map:
+        q_cache_path = os.path.join(output_dir, "questions.json")
+        if os.path.exists(q_cache_path):
+            try:
+                with open(q_cache_path, "r", encoding="utf-8") as f:
+                    q_list = json.load(f)
+                for i, q in enumerate(q_list):
+                    slug = q.get("title_slug")
+                    if slug:
+                        q_map[slug] = f"Q{i+1}"
+            except Exception:
+                pass
 
     # Fallback question mapping if empty
     if not q_map and questions_to_scan:
@@ -1331,7 +1387,7 @@ def run_keyword_replay_scan(contest_slug, keywords=None, limit=500, questions_to
     return output
 
 def load_keyword_results(contest_slug):
-    """Loads cached keyword scan results."""
+    """Loads cached keyword scan results and heals any missing ranks/ratings using top500_ai_results."""
     import json
     output_dir, _, _, _ = get_paths(contest_slug)
     results_path = os.path.join(output_dir, "keyword_scan_results.json")
@@ -1339,7 +1395,90 @@ def load_keyword_results(contest_slug):
         return None
     try:
         with open(results_path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+
+        suspects = data.get("suspects", [])
+        needs_rank_heal = any(s.get("rank") in (99999, "99999", None) for s in suspects)
+        
+        if needs_rank_heal:
+            # Build lookup from top500_ai_results, raw_data, and user_slugs
+            rank_map = {}
+            top500_path = os.path.join(output_dir, "top500_ai_results.json")
+            if os.path.exists(top500_path):
+                try:
+                    with open(top500_path, "r", encoding="utf-8") as tf:
+                        top_data = json.load(tf)
+                    for s in top_data.get("suspects", []):
+                        u = s.get("username")
+                        us = s.get("user_slug") or u
+                        r = s.get("rank")
+                        rating = s.get("rating")
+                        attended = s.get("attended")
+                        meta = {"rank": r, "rating": rating, "attended": attended, "user_slug": us}
+                        if u and r not in (99999, None):
+                            rank_map[u] = meta
+                        if us and r not in (99999, None):
+                            rank_map[us] = meta
+                except Exception:
+                    pass
+
+            raw_path = os.path.join(output_dir, "raw_data.json")
+            if os.path.exists(raw_path):
+                try:
+                    with open(raw_path, "r", encoding="utf-8") as rf:
+                        raw_data = json.load(rf)
+                    for rank_entry in raw_data.get("total_rank", []):
+                        u = rank_entry.get("username")
+                        us = rank_entry.get("user_slug") or u
+                        raw_r = rank_entry.get("rank")
+                        human_r = (raw_r + 1) if raw_r is not None else 99999
+                        meta = {"rank": human_r, "user_slug": us}
+                        if u and u not in rank_map:
+                            rank_map[u] = meta
+                        if us and us not in rank_map:
+                            rank_map[us] = meta
+                except Exception:
+                    pass
+
+            slugs_path = os.path.join(output_dir, "user_slugs.json")
+            if os.path.exists(slugs_path):
+                try:
+                    with open(slugs_path, "r", encoding="utf-8") as sf:
+                        slug_dict = json.load(sf)
+                    for uname, uslug in slug_dict.items():
+                        if uname in rank_map and uslug not in rank_map:
+                            rank_map[uslug] = rank_map[uname]
+                        elif uslug in rank_map and uname not in rank_map:
+                            rank_map[uname] = rank_map[uslug]
+                except Exception:
+                    pass
+
+            healed = False
+            for s in suspects:
+                if s.get("rank") in (99999, "99999", None):
+                    u = s.get("username")
+                    us = s.get("user_slug") or u
+                    match_meta = rank_map.get(u) or rank_map.get(us)
+                    if match_meta and match_meta.get("rank") not in (99999, None):
+                        s["rank"] = match_meta["rank"]
+                        if match_meta.get("user_slug"):
+                            s["user_slug"] = match_meta["user_slug"]
+                        if (not s.get("rating") or s.get("rating") == "N/A") and match_meta.get("rating"):
+                            s["rating"] = match_meta["rating"]
+                        if not s.get("attended") and match_meta.get("attended"):
+                            s["attended"] = match_meta["attended"]
+                        healed = True
+
+            if healed:
+                suspects.sort(key=lambda s: s.get("rank", 99999))
+                data["suspects"] = suspects
+                try:
+                    with open(results_path, "w", encoding="utf-8") as wf:
+                        json.dump(data, wf, indent=2)
+                except Exception:
+                    pass
+
+        return data
     except Exception:
         return None
 
