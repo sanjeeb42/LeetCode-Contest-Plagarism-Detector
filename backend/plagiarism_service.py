@@ -270,12 +270,31 @@ def get_contest_questions(contest_slug):
         except Exception:
             pass
 
-    # 3. Live fetch from contest info API
+    # 3. Live fetch from contest info API (with retry and browser fallback)
+    from curl_cffi import requests
+    url = f"https://leetcode.com/contest/api/info/{contest_slug}/"
+    headers = {"Accept-Encoding": "gzip, deflate"}
+    for attempt in range(3):
+        try:
+            resp = requests.get(url, headers=headers, impersonate="safari15_5", timeout=12)
+            if resp.status_code == 200:
+                data = resp.json()
+                questions = data.get("questions", [])
+                if questions:
+                    try:
+                        with open(q_cache_path, "w", encoding="utf-8") as f:
+                            json.dump(questions, f, indent=2)
+                    except Exception:
+                        pass
+                    return questions
+        except Exception as e:
+            print(f"[!] Attempt {attempt + 1} fetching contest questions failed: {e}")
+        import time
+        time.sleep(0.5)
+
+    # 4. Fallback: try chrome impersonation if safari failed
     try:
-        from curl_cffi import requests
-        url = f"https://leetcode.com/contest/api/info/{contest_slug}/"
-        headers = {"Accept-Encoding": "gzip, deflate"}
-        resp = requests.get(url, headers=headers, impersonate="safari15_5", timeout=12)
+        resp = requests.get(url, headers=headers, impersonate="chrome120", timeout=12)
         if resp.status_code == 200:
             data = resp.json()
             questions = data.get("questions", [])
@@ -287,7 +306,7 @@ def get_contest_questions(contest_slug):
                     pass
                 return questions
     except Exception as e:
-        print(f"[!] Error fetching contest questions for {contest_slug}: {e}")
+        print(f"[!] Chrome fallback fetching contest questions failed: {e}")
 
     return []
 
